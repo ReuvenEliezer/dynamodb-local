@@ -25,8 +25,8 @@ jobs:
         uses: dorny/test-reporter@v1.9.1 #{owner}/{repository}@{ref}
         if: (success() || failure())
         with:
-          name: Tests - converter-service #for analysis tests report
-          path: dynamodb-local/target/surefire-reports/*.xml
+          name: Tests  #for analysis tests report
+          path: dynamodb-local\target\surefire-reports\*.xml
           reporter: java-junit
           fail-on-error: true
 
