@@ -1,0 +1,29 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: @project.artifactId@
+    version: @project.version@
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # only for testing purpose, switch back to 0.1 for production code
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    loggers:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+springdoc:
+  version: '@springdoc.version@'
+  api-docs:
+    version: openapi_3_1
+  swagger-ui:
+    use-root-path: true
