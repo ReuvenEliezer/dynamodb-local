@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 @Repository
 public class UserMessagesRepository {
@@ -27,35 +28,49 @@ public class UserMessagesRepository {
 
     private final DynamoDbEnhancedClient dynamoDbEnhancedClient;
     private final DynamoDbTable<UserMessages> userMessagesTable;
+    private final DynamoDbIndex<UserMessages> userMessagesTableIndex;
     private final DynamoDbClient dynamoDbClient;
+
 
     public UserMessagesRepository(DynamoDbClient dynamoDbClient, DynamoDbEnhancedClient dynamoDbEnhancedClient) {
         this.dynamoDbClient = dynamoDbClient;
         this.dynamoDbEnhancedClient = dynamoDbEnhancedClient;
         this.userMessagesTable = dynamoDbEnhancedClient.table(UserMessages.class.getSimpleName(), TableSchema.fromBean(UserMessages.class));
+        this.userMessagesTableIndex = userMessagesTable.index(UserMessages.class.getSimpleName() + "Index");
     }
 
     public void save(UserMessages userMessages) {
-//        PutItemEnhancedRequest<UserMessages> request = PutItemEnhancedRequest.builder(UserMessages.class)
-//                .item(userMessages)
-//                .build();
-
-//        userMessagesTable.putItem(request);
-//        UserMessages item = userMessagesTable.getItem(userMessages);
-//        UserMessages item1 = userMessagesTable.getItem(r -> r.key(k -> k.partitionValue(userMessages.getUserId()).sortValue(userMessages.getCreatedTime())));
-//        List<String> strings = userMessagesTable.tableSchema().attributeNames();
         userMessagesTable.putItem(userMessages);
-//        UserMessages item2 = userMessagesTable.getItem(userMessages);
-//        List<UserMessages> items = getUserMessages(userMessages.getUserId(), LocalDateTime.now(ZoneOffset.UTC));
+    }
+
+    public void delete(UserMessages userMessages) {
+        userMessagesTable.deleteItem(userMessages);
     }
 
     public void save(List<UserMessages> userMessagesList) {
+        if (userMessagesList.isEmpty()) {
+            return;
+        }
+        doInBatch(writeBatchBuilder -> userMessagesList.forEach(writeBatchBuilder::addPutItem));
+    }
+
+    public void delete(List<UserMessages> userMessagesList) {
+        if (userMessagesList.isEmpty()) {
+            return;
+        }
+        doInBatch(writeBatchBuilder -> userMessagesList.forEach(writeBatchBuilder::addDeleteItem));
+    }
+
+    private void doInBatch(Consumer<WriteBatch.Builder<UserMessages>> action) {
         WriteBatch.Builder<UserMessages> writeBatchBuilder = WriteBatch.builder(UserMessages.class)
                 .mappedTableResource(userMessagesTable);
-        userMessagesList.forEach(writeBatchBuilder::addPutItem);
+
+        action.accept(writeBatchBuilder);
+
         BatchWriteItemEnhancedRequest batchWriteRequest = BatchWriteItemEnhancedRequest.builder()
                 .addWriteBatch(writeBatchBuilder.build())
                 .build();
+
         dynamoDbEnhancedClient.batchWriteItem(batchWriteRequest);
     }
 
@@ -78,7 +93,6 @@ public class UserMessagesRepository {
         return pages.stream()
                 .flatMap(page -> page.items().stream())
                 .toList();
-//        return userMessagesTable.getItem(r -> r.key(k -> k.partitionValue(userId).sortValue(createdTime)));
     }
 
     private static void printUserMessage(List<UserMessages> userMessages) {
@@ -113,11 +127,9 @@ public class UserMessagesRepository {
             queryRequestBuilder.exclusiveStartKey(lastEvaluatedKey);
         }
 
+//        SdkIterable<Page<UserMessages>> scan = userMessagesTableIndex.scan();
 
-        DynamoDbIndex<UserMessages> index = userMessagesTable.index(UserMessages.class.getSimpleName() + "Index");
-//        SdkIterable<Page<UserMessages>> scan = index.scan();
-
-        SdkIterable<Page<UserMessages>> pages = index.query(queryRequestBuilder.build());
+        SdkIterable<Page<UserMessages>> pages = userMessagesTableIndex.query(queryRequestBuilder.build());
         for (Page<UserMessages> page : pages) {
             printUserMessage(page.items());
             logger.info("LastEvaluatedKey: {}", page.lastEvaluatedKey());

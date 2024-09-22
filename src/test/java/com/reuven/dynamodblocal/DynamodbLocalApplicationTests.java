@@ -74,9 +74,10 @@ class DynamodbLocalApplicationTests {
     void cleanUp() {
         ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
         PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
-        for (UserMessages userMessages : pages.items()) {
-            userMessagesTable.deleteItem(userMessages);
-        }
+        userMessagesRepository.delete(pages.items().stream().toList());
+//        for (UserMessages userMessages : pages.items()) {
+//            userMessagesTable.deleteItem(userMessages);
+//        }
     }
 
     @Test
