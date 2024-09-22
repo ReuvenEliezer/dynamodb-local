@@ -17,16 +17,18 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
+      - name: Build by Maven
+        run: mvn clean install -DskipTests=true
+      - name: run dev tests
+        run: mvn test
       - name: "docker compose up"
         run: docker compose -f docker-compose.yml up -d --wait
-      - name: Build by Maven and run tests
-        run: mvn clean install
       - name: dynamodb-local JUnit Test Report
         uses: dorny/test-reporter@v1.9.1 #{owner}/{repository}@{ref}
         if: (success() || failure())
         with:
           name: Tests  #for analysis tests report
-          path: dynamodb-local\target\surefire-reports\*.xml
+          path: dynamodb-local/target/surefire-reports/*.xml
           reporter: java-junit
           fail-on-error: true
 
