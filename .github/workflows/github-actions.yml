@@ -17,6 +17,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
+      - name: "docker compose up"
+        run: docker compose -f docker-compose.yml up -d --wait
       - name: Build by Maven and run tests
         run: mvn clean install
       - name: dynamodb-local JUnit Test Report
@@ -27,8 +29,6 @@ jobs:
           path: dynamodb-local/target/surefire-reports/*.xml
           reporter: java-junit
           fail-on-error: true
-      - name: "docker compose up"
-        run: docker compose -f docker-compose.yml up -d --wait
 
       - name: Generate build number
         id: buildnumber
