@@ -18,11 +18,10 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.ScanEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
+import software.amazon.awssdk.services.dynamodb.model.*;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -74,59 +73,160 @@ class DynamodbLocalApplicationTests {
     @BeforeEach
     void cleanUp() {
         ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
-        PageIterable<UserMessages> scan = userMessagesTable.scan(scanRequest);
-        for (UserMessages userMessages : scan.items()) {
+        PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
+        for (UserMessages userMessages : pages.items()) {
             userMessagesTable.deleteItem(userMessages);
         }
+    }
+
+    @Test
+    void tableExistsTest() {
+        List<String> tableNames = dynamoDbClient.listTables().tableNames();
+        assertThat(tableNames).containsExactlyInAnyOrder(UserMessages.class.getSimpleName());
+    }
+
+    @Test
+    void indexExistsTest() {
+        DescribeTableResponse describeTableResponse = dynamoDbClient.describeTable(DescribeTableRequest.builder()
+                .tableName(UserMessages.class.getSimpleName())
+                .build());
+
+        assertThat(describeTableResponse.table().globalSecondaryIndexes())
+                .extracting(GlobalSecondaryIndexDescription::indexName)
+                .contains(UserMessages.class.getSimpleName() + "Index");
     }
 
 
     @Test
     void saveElementTest() {
-        userMessagesRepository.save(new UserMessages("2", "message1"));
-        List<UserMessages> userMessages = userMessagesRepository.getUserMessages("2", LocalDateTime.now(ZoneOffset.UTC));
+        String userId = "1";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        userMessagesRepository.save(createUserMessage(userId, "message", now));
+        List<UserMessages> userMessages = userMessagesRepository.getUserMessages(userId);
         assertThat(userMessages).isNotEmpty();
         assertThat(userMessages).hasSize(1);
     }
 
     @Test
-    void sortTest() {
-        dynamoDbClient.listTables().tableNames().forEach(System.out::println);
-        userMessagesRepository.save(new UserMessages("2", "message1"));
-        userMessagesRepository.save(new UserMessages("2", "message2"));
+    void userMessagesBatchSaveTest() {
+        String userId1 = "1";
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        LocalDateTime time = LocalDateTime.of(2024, 9, 18, 0, 0);
-        List<UserMessages> userMessages = userMessagesRepository.getUserMessages("1", now);
-        List<UserMessages> userMessages1 = userMessagesRepository.getUserMessages("1", time);
-        List<UserMessages> userMessages2 = userMessagesRepository.getUserMessages("1", time);
+        LocalDateTime yesterday = now.minusDays(1);
+        UserMessages user1Message1Today = createUserMessage(userId1, "message1", now);
+        UserMessages user1Message2Today = createUserMessage(userId1, "message2", now.minusHours(1));
+        UserMessages user1Message3Yesterday = createUserMessage(userId1, "message3", yesterday);
+        UserMessages user1Message4Yesterday = createUserMessage(userId1, "message4", yesterday.minusHours(1));
 
-        List<UserMessages> userMessages3 = userMessagesRepository.getUserMessages("1", now, 2);
-        List<UserMessages> userMessages4 = userMessagesRepository.getUserMessages("1", time, 1);
-        List<UserMessages> userMessages5 = userMessagesRepository.getUserMessages("1", time);
+        String userId2 = "2";
+        UserMessages user2Message1Today = createUserMessage(userId2, "message1", now);
+        UserMessages user2Message2Today = createUserMessage(userId2, "message2", now.minusHours(1));
+        UserMessages user2Message3Yesterday = createUserMessage(userId2, "message3", yesterday);
+        UserMessages user2Message4Yesterday = createUserMessage(userId2, "message4", yesterday.minusHours(1));
 
+        userMessagesRepository.save(List.of(
+                user1Message1Today, user1Message2Today, user1Message3Yesterday, user1Message4Yesterday,
+                user2Message1Today, user2Message2Today, user2Message3Yesterday, user2Message4Yesterday
+        ));
 
-        Map<String, AttributeValue> lastEvaluatedKey1 = Map.of(
-                "UserId", AttributeValue.builder().s("1").build(),
-                "CreatedTime", AttributeValue.builder().s(time.toString()).build()
-        );
+        ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
+        PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
+        assertThat(pages.items()).hasSize(8);
+    }
 
-        PaginatedResult<UserMessages> userMessages6;
-        do {
-            userMessages6 = userMessagesRepository.getUserMessages("1", time, 1, lastEvaluatedKey1);
-            logger.info("userMessages6 - items: {}", userMessages6.items());
-            lastEvaluatedKey1 = userMessages6.lastEvaluatedKey();
-            logger.info("LastEvaluatedKey: {}", lastEvaluatedKey1);
-            userMessages6.items().forEach(System.out::println);
-        } while (userMessages6.lastEvaluatedKey() != null);
+    @Test
+    void userMessagesWithSameTimeTest() {
+        String userId1 = "1";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
+        userMessagesRepository.save(List.of(
+                createUserMessage(userId1, "message1", now),
+                createUserMessage(userId1, "message2", now)
+        ));
+
+        ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
+        PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
+        assertThat(pages.items()).hasSize(2);
 
 
         Map<String, AttributeValue> lastEvaluatedKey = null;
         QueryResponse queryResponse;
         do {
-            queryResponse = userMessagesRepository.getUserMessages("1", lastEvaluatedKey, 1);
+            queryResponse = userMessagesRepository.getUserMessages(userId1, lastEvaluatedKey, 1);
             lastEvaluatedKey = queryResponse.lastEvaluatedKey();
             queryResponse.items().forEach(System.out::println);
         } while (queryResponse.hasLastEvaluatedKey());
+    }
+
+    @Test
+    void paginationTest() {
+        String userId1 = "1";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        UserMessages user1Message1Now = createUserMessage(userId1, "message1", now);
+        UserMessages user1Message2Now = createUserMessage(userId1, "message2", now.minusDays(1));
+
+        String userId2 = "2";
+        UserMessages user2Message1Now = createUserMessage(userId2, "message1", now);
+        UserMessages user2Message2Now = createUserMessage(userId2, "message2", now.minusDays(1));
+
+        userMessagesRepository.save(List.of(
+                user1Message1Now, user1Message2Now,
+                user2Message1Now, user2Message2Now
+        ));
+
+        Map<String, AttributeValue> lastEvaluatedKey = Map.of(
+                "UserId", AttributeValue.builder().s(userId1).build(),
+                "CreatedTime", AttributeValue.builder().s(now.toString()).build(),
+                "MessageUuid", AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
+        );
+
+        PaginatedResult<UserMessages> userMessages;
+        int limit = 1;
+        int count = 0;
+        do {
+            userMessages = userMessagesRepository.getUserMessages(userId1, now.plusDays(1), limit, lastEvaluatedKey);
+            logger.info("userMessages - items: {}", userMessages.items());
+            lastEvaluatedKey = userMessages.lastEvaluatedKey();
+            logger.info("LastEvaluatedKey: {}", lastEvaluatedKey);
+            userMessages.items().forEach(System.out::println);
+            if (userMessages.lastEvaluatedKey() != null) {
+                count++;
+            }
+        } while (userMessages.lastEvaluatedKey() != null);
+
+        assertThat(count).isEqualTo(2);
+
+
+        count = 0;
+        do {
+            userMessages = userMessagesRepository.getUserMessages(userId1, now.minusDays(1), limit, lastEvaluatedKey);
+            logger.info("userMessages - items: {}", userMessages.items());
+            lastEvaluatedKey = userMessages.lastEvaluatedKey();
+            logger.info("LastEvaluatedKey: {}", lastEvaluatedKey);
+            userMessages.items().forEach(System.out::println);
+            if (userMessages.lastEvaluatedKey() != null) {
+                count++;
+            }
+        } while (userMessages.lastEvaluatedKey() != null);
+
+        assertThat(count).isEqualTo(1);
+    }
+
+
+    private UserMessages createUserMessage(String userId, String message, LocalDateTime createdTime) {
+        UserMessages userMessages = new UserMessages(userId, message);
+        setField(userMessages, "createdTime", createdTime);
+        return userMessages;
+    }
+
+
+    private void setField(Object object, String fieldName, Object value) {
+        try {
+            Field field = object.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(object, value);
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

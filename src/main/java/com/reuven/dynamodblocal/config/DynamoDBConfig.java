@@ -34,7 +34,7 @@ public class DynamoDBConfig {
                 .endpointOverride(URI.create("http://localhost:8000"))
                 .region(Region.US_WEST_2)
                 .build();
-        createTable(amazonDynamoDB, USER_MESSAGES_TABLE_NAME, "UserId", "CreatedTime");
+        createTable(amazonDynamoDB, USER_MESSAGES_TABLE_NAME, "UserId", "MessageUuid");
         return amazonDynamoDB;
     }
 
@@ -60,6 +60,10 @@ public class DynamoDBConfig {
                         AttributeDefinition.builder()
                                 .attributeName(sortKey)
                                 .attributeType(ScalarAttributeType.S) // Sort key type
+                                .build(),
+                        AttributeDefinition.builder()
+                                .attributeName("CreatedTime")
+                                .attributeType(ScalarAttributeType.S)
                                 .build())
                 .keySchema(
                         KeySchemaElement.builder()
@@ -70,10 +74,24 @@ public class DynamoDBConfig {
                                 .attributeName(sortKey)
                                 .keyType(KeyType.RANGE) // Sort key
                                 .build())
-                .provisionedThroughput(ProvisionedThroughput.builder()
-                        .readCapacityUnits(10L)
-                        .writeCapacityUnits(10L)
-                        .build())
+                .globalSecondaryIndexes(
+                        GlobalSecondaryIndex.builder()
+                                .indexName(UserMessages.class.getSimpleName() + "Index")
+                                .keySchema(
+                                        KeySchemaElement.builder()
+                                                .attributeName(partitionKey)
+                                                .keyType(KeyType.HASH)
+                                                .build(),
+                                        KeySchemaElement.builder()
+                                                .attributeName("CreatedTime")
+                                                .keyType(KeyType.RANGE)
+                                                .build())
+                                .projection(Projection.builder()
+                                        .projectionType(ProjectionType.ALL)
+                                        .build())
+                                .provisionedThroughput(buildProvisionedThroughput(5L, 5L))
+                                .build())
+                .provisionedThroughput(buildProvisionedThroughput(10L, 10L))
                 .tableName(tableName)
                 .build();
 
@@ -87,6 +105,13 @@ public class DynamoDBConfig {
 
         String tableId = response.tableDescription().tableName();
         logger.info("Created table '{}'", tableId);
+    }
+
+    private static ProvisionedThroughput buildProvisionedThroughput(Long readCapacityUnits, Long writeCapacityUnits) {
+        return ProvisionedThroughput.builder()
+                .readCapacityUnits(readCapacityUnits)
+                .writeCapacityUnits(writeCapacityUnits)
+                .build();
     }
 
 

@@ -5,23 +5,17 @@ import com.reuven.dynamodblocal.entities.UserMessages;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Repository;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
-import software.amazon.awssdk.enhanced.dynamodb.model.Page;
-import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.core.pagination.sync.SdkIterable;
+import software.amazon.awssdk.enhanced.dynamodb.*;
+import software.amazon.awssdk.enhanced.dynamodb.model.*;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
 import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,26 +49,23 @@ public class UserMessagesRepository {
 //        List<UserMessages> items = getUserMessages(userMessages.getUserId(), LocalDateTime.now(ZoneOffset.UTC));
     }
 
-    public List<UserMessages> getUserMessages(String userId, LocalDateTime createdTimeBefore, Integer limit) {
-//        logger.info("all records");
-//        PageIterable<UserMessages> queryResponse = userMessagesTable.query(QueryConditional.keyEqualTo(
-//                Key.builder()
-//                        .partitionValue(userId)
-//                        .sortValue(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME))
-//                        .build()
-//        ));
+    public void save(List<UserMessages> userMessagesList) {
+        WriteBatch.Builder<UserMessages> writeBatchBuilder = WriteBatch.builder(UserMessages.class)
+                .mappedTableResource(userMessagesTable);
+        userMessagesList.forEach(writeBatchBuilder::addPutItem);
+        BatchWriteItemEnhancedRequest batchWriteRequest = BatchWriteItemEnhancedRequest.builder()
+                .addWriteBatch(writeBatchBuilder.build())
+                .build();
+        dynamoDbEnhancedClient.batchWriteItem(batchWriteRequest);
+    }
 
-//        SdkIterable<UserMessages> items = queryResponse.items();
-//        printUserMessage(items.stream().toList());
-
+    public List<UserMessages> getUserMessages(String userId, Integer limit) {
         logger.info("sorted and limit");
         QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.sortLessThanOrEqualTo(
+                .queryConditional(QueryConditional.keyEqualTo(
                         Key.builder()
                                 .partitionValue(userId)
-                                .sortValue(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME))
-                                .build()
-                ))
+                                .build()))
                 .limit(limit)
                 .build();
 
@@ -98,8 +89,8 @@ public class UserMessagesRepository {
         });
     }
 
-    public List<UserMessages> getUserMessages(String userId, LocalDateTime createdTimeBefore) {
-        return getUserMessages(userId, createdTimeBefore, null);
+    public List<UserMessages> getUserMessages(String userId) {
+        return getUserMessages(userId, null);
     }
 
     public PaginatedResult<UserMessages> getUserMessages(String userId, LocalDateTime createdTimeBefore, Integer limit,
@@ -116,16 +107,26 @@ public class UserMessagesRepository {
                 .limit(limit);
 
         if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
+            if (!lastEvaluatedKey.containsKey("UserId") || !lastEvaluatedKey.containsKey("CreatedTime") || !lastEvaluatedKey.containsKey("MessageUuid")) {
+                throw new IllegalArgumentException("Invalid lastEvaluatedKey provided");
+            }
             queryRequestBuilder.exclusiveStartKey(lastEvaluatedKey);
         }
 
-        PageIterable<UserMessages> pages = userMessagesTable.query(queryRequestBuilder.build());
 
+        DynamoDbIndex<UserMessages> index = userMessagesTable.index(UserMessages.class.getSimpleName() + "Index");
+//        SdkIterable<Page<UserMessages>> scan = index.scan();
+
+        SdkIterable<Page<UserMessages>> pages = index.query(queryRequestBuilder.build());
+        for (Page<UserMessages> page : pages) {
+            printUserMessage(page.items());
+            logger.info("LastEvaluatedKey: {}", page.lastEvaluatedKey());
+        }
         Optional<Page<UserMessages>> firstPage = pages.stream().findFirst();
 
-        if (firstPage.isEmpty()) {
+        if (firstPage.isEmpty() || firstPage.get().items().isEmpty()) {
             logger.info("no results found");
-            return new PaginatedResult<>(new ArrayList<>(), null);
+            return new PaginatedResult<>(Collections.emptyList(), null);
         }
 
         Page<UserMessages> page = firstPage.get();
