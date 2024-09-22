@@ -17,12 +17,10 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
-      - name: Build by Maven
-        run: mvn clean install -DskipTests=true
       - name: "docker compose up"
         run: docker compose -f docker-compose.yml up -d --wait
-      - name: run tests
-        run: mvn test
+      - name: Build by Maven & Run Tests
+        run: mvn clean install
       - name: dynamodb-local JUnit Test Report
         uses: dorny/test-reporter@v1.9.1 #{owner}/{repository}@{ref}
         if: (success() || failure())
