@@ -32,42 +32,6 @@ public class OnAppReady implements ApplicationListener<ApplicationReadyEvent> {
 
     @Override
     public void onApplicationEvent(final ApplicationReadyEvent readyEvent) {
-//        dynamoDbClient.listTables().tableNames().forEach(System.out::println);
-//        userMessagesRepository.save(new UserMessages("2", "message1"));
-//        userMessagesRepository.save(new UserMessages("2", "message2"));
-//        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-//        LocalDateTime time = LocalDateTime.of(2024, 9, 18, 0, 0);
-//        List<UserMessages> userMessages = userMessagesRepository.getUserMessages("1", now);
-//        List<UserMessages> userMessages1 = userMessagesRepository.getUserMessages("1", time);
-//        List<UserMessages> userMessages2 = userMessagesRepository.getUserMessages("1", time);
-//
-//        List<UserMessages> userMessages3 = userMessagesRepository.getUserMessages("1", now, 2);
-//        List<UserMessages> userMessages4 = userMessagesRepository.getUserMessages("1", time, 1);
-//        List<UserMessages> userMessages5 = userMessagesRepository.getUserMessages("1", time);
-//
-//
-//        Map<String, AttributeValue> lastEvaluatedKey1 = Map.of(
-//                "UserId", AttributeValue.builder().s("1").build(),
-//                "CreatedTime", AttributeValue.builder().s(time.toString()).build()
-//        );
-//
-//        PaginatedResult<UserMessages> userMessages6;
-//        do {
-//            userMessages6 = userMessagesRepository.getUserMessages("1", time, 1, lastEvaluatedKey1);
-//            logger.info("userMessages6 - items: {}", userMessages6.items());
-//            lastEvaluatedKey1 = userMessages6.lastEvaluatedKey();
-//            logger.info("LastEvaluatedKey: {}", lastEvaluatedKey1);
-//            userMessages6.items().forEach(System.out::println);
-//        } while (userMessages6.lastEvaluatedKey() != null);
-//
-//
-//        Map<String, AttributeValue> lastEvaluatedKey = null;
-//        QueryResponse queryResponse;
-//        do {
-//            queryResponse = userMessagesRepository.getUserMessages("1", lastEvaluatedKey, 1);
-//            lastEvaluatedKey = queryResponse.lastEvaluatedKey();
-//            queryResponse.items().forEach(System.out::println);
-//        } while (queryResponse.hasLastEvaluatedKey());
     }
 
 

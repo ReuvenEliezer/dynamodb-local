@@ -6,15 +6,14 @@ import com.reuven.dynamodblocal.repositories.UserMessagesRepository;
 import jakarta.annotation.PostConstruct;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.assertj.core.api.AbstractThrowableAssert;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteResult;
 import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.ScanEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -24,10 +23,13 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class DynamodbLocalApplicationTests {
@@ -55,7 +57,7 @@ class DynamodbLocalApplicationTests {
 //            .withExposedPorts(8000);
 //
 
-    static Process pr;
+    private static Process pr;
 
     @BeforeAll
     static void setUp() throws IOException {
@@ -147,15 +149,6 @@ class DynamodbLocalApplicationTests {
         ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
         PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
         assertThat(pages.items()).hasSize(2);
-
-
-        Map<String, AttributeValue> lastEvaluatedKey = null;
-        QueryResponse queryResponse;
-        do {
-            queryResponse = userMessagesRepository.getUserMessages(userId1, lastEvaluatedKey, 1);
-            lastEvaluatedKey = queryResponse.lastEvaluatedKey();
-            queryResponse.items().forEach(System.out::println);
-        } while (queryResponse.hasLastEvaluatedKey());
     }
 
     @Test
@@ -212,11 +205,118 @@ class DynamodbLocalApplicationTests {
         assertThat(count).isEqualTo(1);
     }
 
+    @Test
+    void paginationQueryResponseTest() {
+        String userId1 = "1";
+        String userId2 = "2";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
+        userMessagesRepository.save(List.of(
+                createUserMessage(userId1, "message1", now),
+                createUserMessage(userId1, "message2", now),
+                createUserMessage(userId2, "message1", now),
+                createUserMessage(userId2, "message2", now)
+        ));
+
+        ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
+        PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
+        assertThat(pages.items()).hasSize(4);
+
+
+        Map<String, AttributeValue> lastEvaluatedKey = null;
+        QueryResponse queryResponse;
+        int count = 0;
+        do {
+            queryResponse = userMessagesRepository.getUserMessages(userId1, lastEvaluatedKey, 1);
+            lastEvaluatedKey = queryResponse.lastEvaluatedKey();
+            queryResponse.items().forEach(System.out::println);
+            if (queryResponse.hasLastEvaluatedKey()) {
+                count++;
+            }
+        } while (queryResponse.hasLastEvaluatedKey());
+
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    void transactionRollBackTest() {
+        String userId1 = "1";
+        String userId2 = "2";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        UUID uuid = UUID.randomUUID();
+
+        assertThatThrownBy(() -> userMessagesRepository.saveInTransact(List.of(
+                createUserMessage(userId2, "message1", now), //valid
+                createUserMessage(userId1, "message1", now), //valid
+                createUserMessage(userId1, "message2", now, uuid), //valid
+                createUserMessage(userId1, "message3", now, uuid) // duplicated (key & sort key) of message2
+        )))
+                .isInstanceOf(DynamoDbException.class)
+                .hasMessageContaining("Transaction request cannot include multiple operations on one item");
+
+        ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
+        PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
+        assertThat(pages.items()).hasSize(0);
+    }
+
+    @Test
+    @Disabled
+    void batchWithNoTransactionalTest() {
+        String userId1 = "1";
+        String userId2 = "2";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        UUID uuid = UUID.randomUUID();
+
+        assertThatThrownBy(() -> {
+            BatchWriteResult batchWriteResult = userMessagesRepository.save(List.of(
+                    createUserMessage(userId2, "message1", now), //valid
+                    createUserMessage(userId1, "message1", now), //valid
+                    createUserMessage(userId1, "message2", now, uuid), //valid
+                    createUserMessage(userId1, "message3", now, uuid) // duplicated (same key & sort key) of userId1-message2
+            ));
+        }).isInstanceOf(DynamoDbException.class)
+                .hasMessageContaining("Provided list of item keys contains duplicates");
+
+        ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
+        PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
+        assertThat(pages.items()).hasSize(3);
+    }
+
+
+    @Test
+    @Disabled
+    void saveWithNonDuplicateErrorTest() {
+        String userId1 = "1";
+        String userId2 = "2";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
+        UserMessages validMessage1 = createUserMessage(userId1, "message1", now);
+        UserMessages invalidMessage = new UserMessages(null, "message2");
+//        UserMessages invalidMessage = createUserMessage(null, "message2", null);
+        UserMessages validMessage2 = createUserMessage(userId2, "message3", now);
+
+        assertThatThrownBy(() ->
+                userMessagesRepository.save(List.of(validMessage1, invalidMessage, validMessage2))
+        )
+                .isInstanceOf(DynamoDbException.class)
+                .hasMessageContaining("One of the required keys was not given a value");
+
+        ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
+        PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
+        assertThat(pages.items()).hasSize(2);
+    }
+
 
     private UserMessages createUserMessage(String userId, String message, LocalDateTime createdTime) {
         UserMessages userMessages = new UserMessages(userId, message);
         setField(userMessages, "createdTime", createdTime);
         return userMessages;
+    }
+
+    private UserMessages createUserMessage(String userId, String message, LocalDateTime createdTime, UUID uuid) {
+        UserMessages userMessage = createUserMessage(userId, message, createdTime);
+        setField(userMessage, "messageUuid", uuid.toString());
+        return userMessage;
     }
 
 
