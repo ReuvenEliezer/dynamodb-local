@@ -2,11 +2,10 @@ package com.reuven.dynamodblocal.repositories;
 
 import com.reuven.dynamodblocal.dto.PaginatedResult;
 import com.reuven.dynamodblocal.entities.UserMessages;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
-import software.amazon.awssdk.enhanced.dynamodb.*;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.*;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -22,56 +21,10 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 @Repository
-public class UserMessagesRepository {
-
-    private static final Logger logger = LogManager.getLogger(UserMessagesRepository.class);
-
-    private final DynamoDbEnhancedClient dynamoDbEnhancedClient;
-    private final DynamoDbTable<UserMessages> userMessagesTable;
-    private final DynamoDbIndex<UserMessages> userMessagesTableIndex;
-    private final DynamoDbClient dynamoDbClient;
-
+public class UserMessagesRepository extends BaseRepository<UserMessages> {
 
     public UserMessagesRepository(DynamoDbClient dynamoDbClient, DynamoDbEnhancedClient dynamoDbEnhancedClient) {
-        this.dynamoDbClient = dynamoDbClient;
-        this.dynamoDbEnhancedClient = dynamoDbEnhancedClient;
-        this.userMessagesTable = dynamoDbEnhancedClient.table(UserMessages.class.getSimpleName(), TableSchema.fromBean(UserMessages.class));
-        this.userMessagesTableIndex = userMessagesTable.index(UserMessages.class.getSimpleName() + "Index");
-    }
-
-    public void save(UserMessages userMessages) {
-        userMessagesTable.putItem(userMessages);
-    }
-
-    public void delete(UserMessages userMessages) {
-        userMessagesTable.deleteItem(userMessages);
-    }
-
-    public void save(List<UserMessages> userMessagesList) {
-        if (userMessagesList.isEmpty()) {
-            return;
-        }
-        doInBatch(writeBatchBuilder -> userMessagesList.forEach(writeBatchBuilder::addPutItem));
-    }
-
-    public void delete(List<UserMessages> userMessagesList) {
-        if (userMessagesList.isEmpty()) {
-            return;
-        }
-        doInBatch(writeBatchBuilder -> userMessagesList.forEach(writeBatchBuilder::addDeleteItem));
-    }
-
-    private void doInBatch(Consumer<WriteBatch.Builder<UserMessages>> action) {
-        WriteBatch.Builder<UserMessages> writeBatchBuilder = WriteBatch.builder(UserMessages.class)
-                .mappedTableResource(userMessagesTable);
-
-        action.accept(writeBatchBuilder);
-
-        BatchWriteItemEnhancedRequest batchWriteRequest = BatchWriteItemEnhancedRequest.builder()
-                .addWriteBatch(writeBatchBuilder.build())
-                .build();
-
-        dynamoDbEnhancedClient.batchWriteItem(batchWriteRequest);
+        super(dynamoDbClient, dynamoDbEnhancedClient, UserMessages.class);
     }
 
     public List<UserMessages> getUserMessages(String userId, Integer limit) {
@@ -84,7 +37,7 @@ public class UserMessagesRepository {
                 .limit(limit)
                 .build();
 
-        PageIterable<UserMessages> pages = userMessagesTable.query(queryRequest);
+        PageIterable<UserMessages> pages = dynamoDbTable.query(queryRequest);
 
         pages.stream().forEach(page -> {
             printUserMessage(page.items());
@@ -95,7 +48,7 @@ public class UserMessagesRepository {
                 .toList();
     }
 
-    private static void printUserMessage(List<UserMessages> userMessages) {
+    private void printUserMessage(List<UserMessages> userMessages) {
         userMessages.forEach(u -> {
             logger.info("UserId: {}", u.getUserId());
             logger.info("CreatedTime: {}", u.getCreatedTime());
@@ -129,7 +82,7 @@ public class UserMessagesRepository {
 
 //        SdkIterable<Page<UserMessages>> scan = userMessagesTableIndex.scan();
 
-        SdkIterable<Page<UserMessages>> pages = userMessagesTableIndex.query(queryRequestBuilder.build());
+        SdkIterable<Page<UserMessages>> pages = dynamoDbTableIndex.query(queryRequestBuilder.build());
         for (Page<UserMessages> page : pages) {
             printUserMessage(page.items());
             logger.info("LastEvaluatedKey: {}", page.lastEvaluatedKey());
@@ -148,7 +101,7 @@ public class UserMessagesRepository {
     }
 
 
-    public QueryResponse getUserMessages(String userId, Map<String, AttributeValue> exclusiveStartKey, int limit) {
+    public QueryResponse getUserMessages(String userId, Map<String, AttributeValue> exclusiveStartKey, Integer limit) {
         QueryRequest queryRequest = QueryRequest.builder()
                 .tableName(UserMessages.class.getSimpleName())
                 .keyConditionExpression("UserId = :userId")
