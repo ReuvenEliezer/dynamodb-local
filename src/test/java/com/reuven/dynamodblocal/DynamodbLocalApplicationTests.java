@@ -6,7 +6,6 @@ import com.reuven.dynamodblocal.repositories.UserMessagesRepository;
 import jakarta.annotation.PostConstruct;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,7 +22,6 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -62,13 +60,13 @@ class DynamodbLocalApplicationTests {
     @BeforeAll
     static void setUp() throws IOException {
         Runtime rt = Runtime.getRuntime();
-        pr = rt.exec("docker compose -f docker-compose.yml up -d --wait");
+//        pr = rt.exec("docker compose -f docker-compose.yml up -d --wait");
 //        dynamoDbLocal.start();
     }
 
     @AfterAll
     static void tearDown() {
-        pr.destroy();
+//        pr.destroy();
 //        dynamoDbLocal.stop();
     }
 
@@ -167,20 +165,20 @@ class DynamodbLocalApplicationTests {
                 user2Message1Now, user2Message2Now
         ));
 
-        Map<String, AttributeValue> lastEvaluatedKey = Map.of(
+        Map<String, AttributeValue> exclusiveStartKey = Map.of(
                 "UserId", AttributeValue.builder().s(userId1).build(),
                 "CreatedTime", AttributeValue.builder().s(now.toString()).build(),
                 "MessageUuid", AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
         );
 
         PaginatedResult<UserMessages> userMessages;
-        int limit = 1;
+        final int limit = 1;
         int count = 0;
         do {
-            userMessages = userMessagesRepository.getUserMessages(userId1, now.plusDays(1), limit, lastEvaluatedKey);
+            userMessages = userMessagesRepository.getUserMessages(userId1, now.plusDays(1), limit, exclusiveStartKey);
             logger.info("userMessages - items: {}", userMessages.items());
-            lastEvaluatedKey = userMessages.lastEvaluatedKey();
-            logger.info("LastEvaluatedKey: {}", lastEvaluatedKey);
+            exclusiveStartKey = userMessages.lastEvaluatedKey();
+            logger.info("LastEvaluatedKey: {}", exclusiveStartKey);
             userMessages.items().forEach(System.out::println);
             if (userMessages.lastEvaluatedKey() != null) {
                 count++;
@@ -192,10 +190,10 @@ class DynamodbLocalApplicationTests {
 
         count = 0;
         do {
-            userMessages = userMessagesRepository.getUserMessages(userId1, now.minusDays(1), limit, lastEvaluatedKey);
+            userMessages = userMessagesRepository.getUserMessages(userId1, now.minusDays(1), limit, exclusiveStartKey);
             logger.info("userMessages - items: {}", userMessages.items());
-            lastEvaluatedKey = userMessages.lastEvaluatedKey();
-            logger.info("LastEvaluatedKey: {}", lastEvaluatedKey);
+            exclusiveStartKey = userMessages.lastEvaluatedKey();
+            logger.info("LastEvaluatedKey: {}", exclusiveStartKey);
             userMessages.items().forEach(System.out::println);
             if (userMessages.lastEvaluatedKey() != null) {
                 count++;
@@ -223,12 +221,12 @@ class DynamodbLocalApplicationTests {
         assertThat(pages.items()).hasSize(4);
 
 
-        Map<String, AttributeValue> lastEvaluatedKey = null;
+        Map<String, AttributeValue> exclusiveStartKey = null;
         QueryResponse queryResponse;
         int count = 0;
         do {
-            queryResponse = userMessagesRepository.getUserMessages(userId1, lastEvaluatedKey, 1);
-            lastEvaluatedKey = queryResponse.lastEvaluatedKey();
+            queryResponse = userMessagesRepository.getUserMessages(userId1, exclusiveStartKey, 1);
+            exclusiveStartKey = queryResponse.lastEvaluatedKey();
             queryResponse.items().forEach(System.out::println);
             if (queryResponse.hasLastEvaluatedKey()) {
                 count++;

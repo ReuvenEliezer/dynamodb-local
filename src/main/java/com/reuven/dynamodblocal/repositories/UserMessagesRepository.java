@@ -49,11 +49,7 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
     }
 
     private void printUserMessage(List<UserMessages> userMessages) {
-        userMessages.forEach(u -> {
-            logger.info("UserId: {}", u.getUserId());
-            logger.info("CreatedTime: {}", u.getCreatedTime());
-            logger.info("Message: {}", u.getMessage());
-        });
+        userMessages.forEach(u -> logger.info("UserId: {}, CreatedTime: {}, Message: {}", u.getUserId(), u.getCreatedTime(), u.getMessage()));
     }
 
     public List<UserMessages> getUserMessages(String userId) {
@@ -61,7 +57,7 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
     }
 
     public PaginatedResult<UserMessages> getUserMessages(String userId, LocalDateTime createdTimeBefore, Integer limit,
-                                                         Map<String, AttributeValue> lastEvaluatedKey) {
+                                                         Map<String, AttributeValue> exclusiveStartKey) {
         logger.info("Fetching paginated records...");
         QueryEnhancedRequest.Builder queryRequestBuilder = QueryEnhancedRequest.builder()
                 .queryConditional(QueryConditional
@@ -70,14 +66,15 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
                                 .sortValue(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME))
                                 .build())
                 )
+//                .consistentRead(false)
                 .scanIndexForward(false)
                 .limit(limit);
 
-        if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
-            if (!lastEvaluatedKey.containsKey("UserId") || !lastEvaluatedKey.containsKey("CreatedTime") || !lastEvaluatedKey.containsKey("MessageUuid")) {
-                throw new IllegalArgumentException("Invalid lastEvaluatedKey provided");
+        if (exclusiveStartKey != null && !exclusiveStartKey.isEmpty()) {
+            if (!exclusiveStartKey.containsKey("UserId") || !exclusiveStartKey.containsKey("CreatedTime") || !exclusiveStartKey.containsKey("MessageUuid")) {
+                throw new IllegalArgumentException("Invalid exclusiveStartKey provided");
             }
-            queryRequestBuilder.exclusiveStartKey(lastEvaluatedKey);
+            queryRequestBuilder.exclusiveStartKey(exclusiveStartKey);
         }
 
 //        SdkIterable<Page<UserMessages>> scan = userMessagesTableIndex.scan();
@@ -95,9 +92,9 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
         }
 
         Page<UserMessages> page = firstPage.get();
-        Map<String, AttributeValue> newLastEvaluatedKey = page.lastEvaluatedKey();
+        Map<String, AttributeValue> lastEvaluatedKey = page.lastEvaluatedKey();
         List<UserMessages> items = page.items();
-        return new PaginatedResult<>(items, newLastEvaluatedKey);
+        return new PaginatedResult<>(items, lastEvaluatedKey);
     }
 
 
@@ -109,6 +106,7 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
                 .limit(limit)
                 .exclusiveStartKey(exclusiveStartKey)
                 .scanIndexForward(false)
+//                .consistentRead(false)
                 .build();
 
         QueryResponse queryResponse = dynamoDbClient.query(queryRequest);
