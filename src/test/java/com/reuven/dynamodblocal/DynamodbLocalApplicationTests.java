@@ -97,7 +97,6 @@ class DynamodbLocalApplicationTests {
                 .contains(UserMessages.class.getSimpleName() + "Index");
     }
 
-
     @Test
     void saveElementTest() {
         String userId = "1";
@@ -204,7 +203,7 @@ class DynamodbLocalApplicationTests {
     }
 
     @Test
-    void paginationQueryResponseTest() {
+    void paginationByQueryResponseSdkTest() {
         String userId1 = "1";
         String userId2 = "2";
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
@@ -225,7 +224,7 @@ class DynamodbLocalApplicationTests {
         QueryResponse queryResponse;
         int count = 0;
         do {
-            queryResponse = userMessagesRepository.getUserMessages(userId1, exclusiveStartKey, 1);
+            queryResponse = userMessagesRepository.getUserMessages(userId1, now.plusDays(1), exclusiveStartKey, 1);
             exclusiveStartKey = queryResponse.lastEvaluatedKey();
             queryResponse.items().forEach(System.out::println);
             if (queryResponse.hasLastEvaluatedKey()) {
@@ -234,6 +233,19 @@ class DynamodbLocalApplicationTests {
         } while (queryResponse.hasLastEvaluatedKey());
 
         assertThat(count).isEqualTo(2);
+
+        exclusiveStartKey = null;
+        count = 0;
+        do {
+            queryResponse = userMessagesRepository.getUserMessages(userId1, now.minusDays(1), exclusiveStartKey, 1);
+            exclusiveStartKey = queryResponse.lastEvaluatedKey();
+            queryResponse.items().forEach(System.out::println);
+            if (queryResponse.hasLastEvaluatedKey()) {
+                count++;
+            }
+        } while (queryResponse.hasLastEvaluatedKey());
+
+        assertThat(count).isEqualTo(0);
     }
 
     @Test
