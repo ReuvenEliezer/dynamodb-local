@@ -6,11 +6,12 @@ import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.*;
+import software.amazon.awssdk.enhanced.dynamodb.model.Page;
+import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
-import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
+import software.amazon.awssdk.services.dynamodb.model.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -18,7 +19,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 @Repository
 public class UserMessagesRepository extends BaseRepository<UserMessages> {
@@ -49,19 +49,17 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
     }
 
     private void printUserMessage(List<UserMessages> userMessages) {
-        userMessages.forEach(u -> {
-            logger.info("UserId: {}", u.getUserId());
-            logger.info("CreatedTime: {}", u.getCreatedTime());
-            logger.info("Message: {}", u.getMessage());
-        });
+        userMessages.forEach(u -> logger.info("UserId: {}, CreatedTime: {}, Message: {}", u.getUserId(), u.getCreatedTime(), u.getMessage()));
     }
 
     public List<UserMessages> getUserMessages(String userId) {
         return getUserMessages(userId, null);
     }
 
-    public PaginatedResult<UserMessages> getUserMessages(String userId, LocalDateTime createdTimeBefore, Integer limit,
-                                                         Map<String, AttributeValue> lastEvaluatedKey) {
+    public PaginatedResult<UserMessages> getUserMessages(String userId,
+                                                         LocalDateTime createdTimeBefore,
+                                                         Integer limit,
+                                                         Map<String, AttributeValue> exclusiveStartKey) {
         logger.info("Fetching paginated records...");
         QueryEnhancedRequest.Builder queryRequestBuilder = QueryEnhancedRequest.builder()
                 .queryConditional(QueryConditional
@@ -70,23 +68,24 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
                                 .sortValue(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME))
                                 .build())
                 )
+//                .consistentRead(false)
                 .scanIndexForward(false)
                 .limit(limit);
 
-        if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
-            if (!lastEvaluatedKey.containsKey("UserId") || !lastEvaluatedKey.containsKey("CreatedTime") || !lastEvaluatedKey.containsKey("MessageUuid")) {
-                throw new IllegalArgumentException("Invalid lastEvaluatedKey provided");
+        if (exclusiveStartKey != null && !exclusiveStartKey.isEmpty()) {
+            if (!exclusiveStartKey.containsKey("UserId") || !exclusiveStartKey.containsKey("CreatedTime") || !exclusiveStartKey.containsKey("MessageUuid")) {
+                throw new IllegalArgumentException("Invalid exclusiveStartKey provided");
             }
-            queryRequestBuilder.exclusiveStartKey(lastEvaluatedKey);
+            queryRequestBuilder.exclusiveStartKey(exclusiveStartKey);
         }
 
-//        SdkIterable<Page<UserMessages>> scan = userMessagesTableIndex.scan();
-
         SdkIterable<Page<UserMessages>> pages = dynamoDbTableIndex.query(queryRequestBuilder.build());
+        //lazy-loading
         for (Page<UserMessages> page : pages) {
             printUserMessage(page.items());
             logger.info("LastEvaluatedKey: {}", page.lastEvaluatedKey());
         }
+
         Optional<Page<UserMessages>> firstPage = pages.stream().findFirst();
 
         if (firstPage.isEmpty() || firstPage.get().items().isEmpty()) {
@@ -95,20 +94,29 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
         }
 
         Page<UserMessages> page = firstPage.get();
-        Map<String, AttributeValue> newLastEvaluatedKey = page.lastEvaluatedKey();
+        Map<String, AttributeValue> lastEvaluatedKey = page.lastEvaluatedKey();
         List<UserMessages> items = page.items();
-        return new PaginatedResult<>(items, newLastEvaluatedKey);
+        return new PaginatedResult<>(items, lastEvaluatedKey);
     }
 
 
-    public QueryResponse getUserMessages(String userId, Map<String, AttributeValue> exclusiveStartKey, Integer limit) {
+    public QueryResponse getUserMessages(String userId, LocalDateTime createdTimeBefore, Map<String, AttributeValue> exclusiveStartKey, Integer limit) {
         QueryRequest queryRequest = QueryRequest.builder()
                 .tableName(UserMessages.class.getSimpleName())
-                .keyConditionExpression("UserId = :userId")
-                .expressionAttributeValues(Map.of(":userId", AttributeValue.builder().s(userId).build()))
+                .indexName(UserMessages.class.getSimpleName() + "Index")
                 .limit(limit)
                 .exclusiveStartKey(exclusiveStartKey)
-                .scanIndexForward(false)
+                .keyConditions(Map.of(
+                        "UserId", Condition.builder()
+                                .comparisonOperator(ComparisonOperator.EQ)
+                                .attributeValueList(AttributeValue.builder().s(userId).build())
+                                .build(),
+                        "CreatedTime", Condition.builder()
+                                .comparisonOperator(ComparisonOperator.LE)
+                                .attributeValueList(AttributeValue.builder().s(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME)).build())
+                                .build())
+                )
+//                .consistentRead(false)
                 .build();
 
         QueryResponse queryResponse = dynamoDbClient.query(queryRequest);
