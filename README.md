@@ -6,11 +6,12 @@ https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.D
 
 ## How to connect to dynamodb server using workbench
 
-![img_1.png](img_1.png)
-![img.png](img.png)
+![dynamodb-workbench.png](dynamodb-workbench.png)
+![dynamodb-workbench-2.png](dynamodb-workbench-2.png)
+
 
 ## User-Messages table: PartitionKey: `userId` and SortKey: `MessageUuid`
-![img_4.png](img_4.png)
+![dynamodb-workbench-table.png](dynamodb-workbench-table.png)
 
 ## Index table: PartitionKey: `userId` and SortKey: `CreatedTime`
-![img_3.png](img_3.png)
+![dynamodb-workbench-index.png](dynamodb-workbench-index.png)
