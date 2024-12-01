@@ -23,6 +23,11 @@ import java.util.Optional;
 @Repository
 public class UserMessagesRepository extends BaseRepository<UserMessages> {
 
+    private static final Map<String, String> EXPRESSION_ATTRIBUTE_NAME_MAP = Map.of(
+            "#message", "Message"
+    );
+    private static final String PROJECTION_EXPRESSION_VALUES = String.join(", ", EXPRESSION_ATTRIBUTE_NAME_MAP.keySet());
+
     public UserMessagesRepository(DynamoDbClient dynamoDbClient, DynamoDbEnhancedClient dynamoDbEnhancedClient) {
         super(dynamoDbClient, dynamoDbEnhancedClient, UserMessages.class);
     }
@@ -116,6 +121,8 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
                                 .attributeValueList(AttributeValue.builder().s(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME)).build())
                                 .build())
                 )
+//                .projectionExpression(PROJECTION_EXPRESSION_VALUES)
+//                .expressionAttributeNames(EXPRESSION_ATTRIBUTE_NAME_MAP)
 //                .consistentRead(false)
                 .build();
 
