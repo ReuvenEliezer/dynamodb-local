@@ -1,0 +1,124 @@
+{
+	"info": {
+		"_postman_id": "134bc551-0e83-4169-b138-d6447c96b9ec",
+		"name": "pagination with script parameters",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "2094799"
+	},
+	"item": [
+		{
+			"name": "getRecentNotificationsPage Copy 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"try {\r",
+							"    // קבלת התגובה כ-JSON\r",
+							"    var data = pm.response.json();\r",
+							"\r",
+							"    // בדיקה אם השדה nextPage קיים\r",
+							"    if (data.nextPage !== undefined && data.nextPage !== null) {\r",
+							"        pm.environment.set(\"nextPage\", data.nextPage);\r",
+							"    } else {\r",
+							"        console.log(\"nextPage is missing in the response.\");\r",
+							"    }\r",
+							"} catch (error) {\r",
+							"    console.error(\"Failed to process response or handle nextPage:\", error);\r",
+							"}\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US",
+						"type": "text",
+						"disabled": true
+					},
+					{
+						"key": "X-Timezone",
+						"value": "America/New_York",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/get-messages-page?size=1&user-id=1&page={{nextPage}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"get-messages-page"
+					],
+					"query": [
+						{
+							"key": "notificationUuid",
+							"value": "4acd0aef-8809-4dab-8508-82aef1071d18",
+							"disabled": true
+						},
+						{
+							"key": "publishDate",
+							"value": "2024-08-27T10:58:35.627604700Z",
+							"disabled": true
+						},
+						{
+							"key": "page",
+							"value": "2024-09-30T11:58:35.785622256Z%234cdbbd36-2b58-4824-9ff5-13da8ce1f08e",
+							"disabled": true
+						},
+						{
+							"key": "page",
+							"value": "2024-11-11T12:48:04.887971700Z%2302d54847-2cbc-45f9-ab7a-7debd072f3da",
+							"disabled": true
+						},
+						{
+							"key": "size",
+							"value": "1"
+						},
+						{
+							"key": "user-id",
+							"value": "1"
+						},
+						{
+							"key": "page",
+							"value": "{{nextPage}}"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
