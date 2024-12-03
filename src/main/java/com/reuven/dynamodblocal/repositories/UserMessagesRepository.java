@@ -1,8 +1,11 @@
 package com.reuven.dynamodblocal.repositories;
 
 import com.reuven.dynamodblocal.dto.PaginatedResult;
+import com.reuven.dynamodblocal.dto.UserMessagesPageResponse;
+import com.reuven.dynamodblocal.dto.UserMessagesPageResponse1;
 import com.reuven.dynamodblocal.entities.UserMessages;
 import org.springframework.stereotype.Repository;
+import org.springframework.web.util.UriUtils;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
@@ -13,6 +16,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -27,6 +31,7 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
             "#message", "Message"
     );
     private static final String PROJECTION_EXPRESSION_VALUES = String.join(", ", EXPRESSION_ATTRIBUTE_NAME_MAP.keySet());
+    private static final String DELIMITER = "#";
 
     public UserMessagesRepository(DynamoDbClient dynamoDbClient, DynamoDbEnhancedClient dynamoDbEnhancedClient) {
         super(dynamoDbClient, dynamoDbEnhancedClient, UserMessages.class);
@@ -104,34 +109,94 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
         return new PaginatedResult<>(items, lastEvaluatedKey);
     }
 
+    public UserMessagesPageResponse getUserMessagesPage(String userId, Integer limit, Map<String, AttributeValue> exclusiveStartKey) {
+        Map<String, Condition> conditionsMap = Map.of(
+                "UserId", Condition.builder()
+                        .comparisonOperator(ComparisonOperator.EQ)
+                        .attributeValueList(AttributeValue.builder().s(userId).build())
+                        .build());
+        QueryResponse queryResponse = getQueryResponse(exclusiveStartKey, limit, conditionsMap);
+        Map<String, AttributeValue> lastEvaluatedKey = queryResponse.lastEvaluatedKey();
+        logger.info("LastEvaluatedKey: {}", lastEvaluatedKey);
+        List<UserMessages> userMessages = toList(queryResponse.items());
+        return new UserMessagesPageResponse(userMessages, lastEvaluatedKey);
+    }
 
-    public QueryResponse getUserMessages(String userId, LocalDateTime createdTimeBefore, Map<String, AttributeValue> exclusiveStartKey, Integer limit) {
+    public UserMessagesPageResponse1 getUserMessagesPage(String userId, Integer limit, String page) {
+        Map<String, Condition> conditionsMap = Map.of(
+                "UserId", Condition.builder()
+                        .comparisonOperator(ComparisonOperator.EQ)
+                        .attributeValueList(AttributeValue.builder().s(userId).build())
+                        .build());
+        Map<String, AttributeValue> exclusiveStartKey = buildExclusiveStartKey(userId, page);
+        QueryResponse queryResponse = getQueryResponse(exclusiveStartKey, limit, conditionsMap);
+        Map<String, AttributeValue> lastEvaluatedKey = queryResponse.lastEvaluatedKey();
+        String nextPage = buildNextPageResult(lastEvaluatedKey);
+        logger.info("nextPage: {}", nextPage);
+        List<UserMessages> userMessages = toList(queryResponse.items());
+        return new UserMessagesPageResponse1(userMessages, nextPage);
+    }
+
+    private static String buildNextPageResult(Map<String, AttributeValue> lastEvaluatedKey) {
+        if (lastEvaluatedKey.isEmpty()) {
+            return null;
+        }
+        String messageUuid = lastEvaluatedKey.get("MessageUuid").s();
+        String createdTime = lastEvaluatedKey.get("CreatedTime").s();
+        return createdTime + UriUtils.encode(DELIMITER, StandardCharsets.UTF_8) + messageUuid;
+    }
+
+    private Map<String, AttributeValue> buildExclusiveStartKey(String userId, String page) {
+        if (page == null) {
+            return null;
+        }
+        String pageDecode = UriUtils.decode(page, StandardCharsets.UTF_8);
+        String[] pageParts = pageDecode.split(DELIMITER);
+        if (pageParts.length != 2) {
+            String message = String.format("Invalid nextPage format for userId=%s, must be in the format: %s%s%s", userId, "CreatedTime", DELIMITER, "MessageUuid");
+            logger.error(message);
+            throw new IllegalArgumentException("message");
+        }
+        String createdTime = pageParts[0];
+        String messageUuid = pageParts[1];
+        return Map.of(
+                "UserId", AttributeValue.builder().s(userId).build(),
+                "MessageUuid", AttributeValue.builder().s(messageUuid).build(),
+                "CreatedTime", AttributeValue.builder().s(createdTime).build()
+        );
+    }
+
+
+    private QueryResponse getQueryResponse(Map<String, AttributeValue> exclusiveStartKey, Integer limit, Map<String, Condition> conditionMap) {
         QueryRequest queryRequest = QueryRequest.builder()
                 .tableName(UserMessages.class.getSimpleName())
                 .indexName(UserMessages.class.getSimpleName() + "Index")
                 .limit(limit)
                 .exclusiveStartKey(exclusiveStartKey)
-                .keyConditions(Map.of(
-                        "UserId", Condition.builder()
-                                .comparisonOperator(ComparisonOperator.EQ)
-                                .attributeValueList(AttributeValue.builder().s(userId).build())
-                                .build(),
-                        "CreatedTime", Condition.builder()
-                                .comparisonOperator(ComparisonOperator.LE)
-                                .attributeValueList(AttributeValue.builder().s(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME)).build())
-                                .build())
-                )
+                .keyConditions(conditionMap)
 //                .projectionExpression(PROJECTION_EXPRESSION_VALUES)
 //                .expressionAttributeNames(EXPRESSION_ATTRIBUTE_NAME_MAP)
 //                .consistentRead(false)
+                .scanIndexForward(false) //false=desc, true=asc //https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Query.html#API_Query_RequestSyntax
                 .build();
 
         QueryResponse queryResponse = dynamoDbClient.query(queryRequest);
-
         Map<String, AttributeValue> lastEvaluatedKey = queryResponse.lastEvaluatedKey();
         logger.info("LastEvaluatedKey: {}", lastEvaluatedKey);
-
         return queryResponse;
+    }
+
+    public QueryResponse getUserMessages(String userId, LocalDateTime createdTimeBefore, Map<String, AttributeValue> exclusiveStartKey, Integer limit) {
+        Map<String, Condition> conditionsMap = Map.of(
+                "UserId", Condition.builder()
+                        .comparisonOperator(ComparisonOperator.EQ)
+                        .attributeValueList(AttributeValue.builder().s(userId).build())
+                        .build(),
+                "CreatedTime", Condition.builder()
+                        .comparisonOperator(ComparisonOperator.LE)
+                        .attributeValueList(AttributeValue.builder().s(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME)).build())
+                        .build());
+        return getQueryResponse(exclusiveStartKey, limit, conditionsMap);
     }
 
 }

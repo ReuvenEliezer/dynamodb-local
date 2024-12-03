@@ -1,18 +1,22 @@
 package com.reuven.dynamodblocal.repositories;
 
+import com.reuven.dynamodblocal.entities.UserMessages;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.BeanTableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteResult;
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.WriteBatch;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public abstract class BaseRepository<T> {
@@ -97,6 +101,13 @@ public abstract class BaseRepository<T> {
         TransactWriteItemsEnhancedRequest transactWriteRequest = transactWriteBuilder.build();
 
         dynamoDbEnhancedClient.transactWriteItems(transactWriteRequest);
+    }
+
+    protected List<T> toList(List<Map<String, AttributeValue>> attMaps) {
+        BeanTableSchema<T> beanTableSchema = TableSchema.fromBean(clazz);
+        return attMaps.stream()
+                .map(beanTableSchema::mapToItem)
+                .toList();
     }
 
 }
