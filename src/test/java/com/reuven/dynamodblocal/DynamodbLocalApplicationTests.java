@@ -1,6 +1,8 @@
 package com.reuven.dynamodblocal;
 
 import com.reuven.dynamodblocal.dto.PaginatedResult;
+import com.reuven.dynamodblocal.dto.UserMessagesPageResponse;
+import com.reuven.dynamodblocal.dto.UserMessagesPageResponse1;
 import com.reuven.dynamodblocal.entities.UserMessages;
 import com.reuven.dynamodblocal.repositories.UserMessagesRepository;
 import jakarta.annotation.PostConstruct;
@@ -22,9 +24,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -201,6 +201,55 @@ class DynamodbLocalApplicationTests {
 
         assertThat(count).isEqualTo(1);
     }
+
+    @Test
+    void paginationByQueryResponseSdkSortedByCreatedDateDESCTest() {
+        String userId1 = "1";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        List<UserMessages> userMessages = List.of(
+                createUserMessage(userId1, "message1", now.minusDays(5)),
+                createUserMessage(userId1, "message2", now.minusDays(4)),
+                createUserMessage(userId1, "message3", now.minusDays(2)),
+                createUserMessage(userId1, "message4", now.minusDays(6))
+        );
+        userMessagesRepository.save(userMessages);
+
+        List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId1);
+        assertThat(userMessagesSaved).hasSize(userMessages.size());
+        assertThat(userMessagesSaved)
+                .satisfies(list -> {
+                    boolean isSorted = list.equals(
+                            list.stream()
+                                    .sorted(Comparator.comparing(UserMessages::getCreatedTime).reversed())
+                                    .toList());
+                    assertThat(isSorted).isFalse();
+                });
+
+        Map<String, AttributeValue> exclusiveStartKey = null;
+        UserMessagesPageResponse userMessagesPage;
+        List<UserMessages> userMessagesResult = new ArrayList<>(userMessages.size());
+        do {
+            userMessagesPage = userMessagesRepository.getUserMessagesPage(userId1, 1, exclusiveStartKey);
+            exclusiveStartKey = userMessagesPage.nextPage();
+            userMessagesPage.userMessages().forEach(System.out::println);
+            userMessagesResult.addAll(userMessagesPage.userMessages());
+        } while (!exclusiveStartKey.isEmpty());
+        assertThat(userMessagesResult).hasSize(userMessages.size());
+        assertThat(userMessagesResult).isSortedAccordingTo(Comparator.comparing(UserMessages::getCreatedTime).reversed());
+
+        List<UserMessages> userMessagesResultSimplePage = new ArrayList<>(userMessages.size());
+        String page = null;
+        UserMessagesPageResponse1 userMessagesPageResponse1;
+        do {
+            userMessagesPageResponse1 = userMessagesRepository.getUserMessagesPage(userId1, 1, page);
+            page = userMessagesPageResponse1.nextPage();
+            userMessagesPageResponse1.userMessages().forEach(System.out::println);
+            userMessagesResultSimplePage.addAll(userMessagesPageResponse1.userMessages());
+        } while (page != null);
+        assertThat(userMessagesResultSimplePage).hasSize(userMessages.size());
+        assertThat(userMessagesResultSimplePage).isSortedAccordingTo(Comparator.comparing(UserMessages::getCreatedTime).reversed());
+    }
+
 
     @Test
     void paginationByQueryResponseSdkTest() {

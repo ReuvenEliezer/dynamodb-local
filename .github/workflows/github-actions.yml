@@ -12,10 +12,10 @@ jobs:
       COMPOSE_FILE: docker-compose.yml
     steps:
       - uses: actions/checkout@v4.1.7
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4.2.2
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'corretto'
       - name: "docker compose up"
         run: docker compose -f docker-compose.yml up -d --wait
