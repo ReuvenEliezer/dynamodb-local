@@ -31,7 +31,7 @@ public class UserMessages {
     private String messageUuid; // Sort Key
     private LocalDateTime createdTime; // Sort Key (stored as String in ISO-8601 format)
     private String message;
-    private UserMetadata userMetaData;
+    private UserMetadata userMetadata;
 
     // Default constructor (Required)
     public UserMessages() {}
@@ -40,12 +40,12 @@ public class UserMessages {
         this(userId, message, null);
     }
 
-    public UserMessages(String userId, String message, UserMetadata userMetaData) {
+    public UserMessages(String userId, String message, UserMetadata userMetadata) {
         this.userId = userId;
         this.createdTime = LocalDateTime.now(ZoneOffset.UTC); //.format(DateTimeFormatter.ISO_DATE_TIME);
         this.messageUuid = UUID.randomUUID().toString();
         this.message = message;
-        this.userMetaData = userMetaData;
+        this.userMetadata = userMetadata;
     }
 
     @DynamoDbPartitionKey
@@ -92,11 +92,11 @@ public class UserMessages {
     @DynamoDbAttribute(Constants.USER_METADATA)
     @DynamoDbConvertedBy(UserMetadataConverter.class)
     public UserMetadata getUserMetadata() {
-        return userMetaData;
+        return userMetadata;
     }
 
     public void setUserMetadata(UserMetadata userMetadata) {
-        this.userMetaData = userMetadata;
+        this.userMetadata = userMetadata;
     }
 
     @Override
