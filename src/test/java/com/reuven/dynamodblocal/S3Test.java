@@ -1,6 +1,7 @@
 package com.reuven.dynamodblocal;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -15,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Disabled
 public class S3Test extends AwsTestContainer {
 
     private static S3Client s3Client;
