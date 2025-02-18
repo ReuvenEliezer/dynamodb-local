@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
+import static com.reuven.dynamodblocal.utils.Constants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -49,25 +50,6 @@ class DynamodbLocalApplicationTests {
     @PostConstruct
     void init() {
         userMessagesTable = dynamoDbEnhancedClient.table(UserMessages.class.getSimpleName(), TableSchema.fromBean(UserMessages.class));
-    }
-
-//    private static final GenericContainer<?> dynamoDbLocal = new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local"))
-//            .withExposedPorts(8000);
-//
-
-    private static Process pr;
-
-    @BeforeAll
-    static void setUp() throws IOException {
-        Runtime rt = Runtime.getRuntime();
-//        pr = rt.exec("docker compose -f docker-compose.yml up -d --wait");
-//        dynamoDbLocal.start();
-    }
-
-    @AfterAll
-    static void tearDown() {
-//        pr.destroy();
-//        dynamoDbLocal.stop();
     }
 
     @BeforeEach
@@ -101,7 +83,7 @@ class DynamodbLocalApplicationTests {
     void saveElementTest() {
         String userId = "1";
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        userMessagesRepository.save(createUserMessage(userId, "message", now));
+        userMessagesRepository.save(createUserMessage(userId, MESSAGE, now));
         List<UserMessages> userMessages = userMessagesRepository.getUserMessages(userId);
         assertThat(userMessages).isNotEmpty();
         assertThat(userMessages).hasSize(1);
@@ -165,9 +147,9 @@ class DynamodbLocalApplicationTests {
         ));
 
         Map<String, AttributeValue> exclusiveStartKey = Map.of(
-                "UserId", AttributeValue.builder().s(userId1).build(),
-                "CreatedTime", AttributeValue.builder().s(now.toString()).build(),
-                "MessageUuid", AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
+                USER_ID, AttributeValue.builder().s(userId1).build(),
+                CREATED_TIME, AttributeValue.builder().s(now.toString()).build(),
+                MESSAGE_UUID, AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
         );
 
         PaginatedResult<UserMessages> userMessages;
