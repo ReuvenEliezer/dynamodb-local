@@ -1,6 +1,8 @@
 package com.reuven.dynamodblocal.entities;
 
-import com.reuven.dynamodblocal.dto.LocalDateTimeConverter;
+import com.reuven.dynamodblocal.dto.converters.LocalDateTimeConverter;
+import com.reuven.dynamodblocal.dto.converters.UserMetadataConverter;
+import com.reuven.dynamodblocal.utils.Constants;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.LocalDateTime;
@@ -29,15 +31,21 @@ public class UserMessages {
     private String messageUuid; // Sort Key
     private LocalDateTime createdTime; // Sort Key (stored as String in ISO-8601 format)
     private String message;
+    private UserMetadata userMetaData;
 
     // Default constructor (Required)
     public UserMessages() {}
 
     public UserMessages(String userId, String message) {
+        this(userId, message, null);
+    }
+
+    public UserMessages(String userId, String message, UserMetadata userMetaData) {
         this.userId = userId;
         this.createdTime = LocalDateTime.now(ZoneOffset.UTC); //.format(DateTimeFormatter.ISO_DATE_TIME);
         this.messageUuid = UUID.randomUUID().toString();
         this.message = message;
+        this.userMetaData = userMetaData;
     }
 
     @DynamoDbPartitionKey
@@ -61,8 +69,8 @@ public class UserMessages {
         this.messageUuid = messageUuid;
     }
 
-    @DynamoDbSecondarySortKey(indexNames = "UserMessagesIndex")
-    @DynamoDbAttribute("CreatedTime")
+    @DynamoDbSecondarySortKey(indexNames = USER_MESSAGES_INDEX)
+    @DynamoDbAttribute(CREATED_TIME)
     @DynamoDbConvertedBy(LocalDateTimeConverter.class)
     public LocalDateTime getCreatedTime() {
         return createdTime;
@@ -81,6 +89,15 @@ public class UserMessages {
         this.message = message;
     }
 
+    @DynamoDbAttribute(Constants.USER_METADATA)
+    @DynamoDbConvertedBy(UserMetadataConverter.class)
+    public UserMetadata getUserMetadata() {
+        return userMetaData;
+    }
+
+    public void setUserMetadata(UserMetadata userMetadata) {
+        this.userMetaData = userMetadata;
+    }
 
     @Override
     public boolean equals(Object o) {

@@ -1,4 +1,4 @@
-package com.reuven.dynamodblocal.dto;
+package com.reuven.dynamodblocal.dto.converters;
 
 import software.amazon.awssdk.enhanced.dynamodb.AttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;

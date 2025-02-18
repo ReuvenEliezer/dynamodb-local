@@ -4,6 +4,7 @@ import com.reuven.dynamodblocal.dto.PaginatedResult;
 import com.reuven.dynamodblocal.dto.UserMessagesPageResponse;
 import com.reuven.dynamodblocal.dto.UserMessagesPageResponse1;
 import com.reuven.dynamodblocal.entities.UserMessages;
+import com.reuven.dynamodblocal.entities.UserMetadata;
 import com.reuven.dynamodblocal.repositories.UserMessagesRepository;
 import jakarta.annotation.PostConstruct;
 import org.apache.logging.log4j.LogManager;
@@ -20,7 +21,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ScanEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -87,6 +87,17 @@ class DynamodbLocalApplicationTests {
         List<UserMessages> userMessages = userMessagesRepository.getUserMessages(userId);
         assertThat(userMessages).isNotEmpty();
         assertThat(userMessages).hasSize(1);
+    }
+
+    @Test
+    void saveElementWithConverterTest() {
+        String userId = "1";
+        UserMessages userMessages = new UserMessages(userId, MESSAGE, new UserMetadata("email@gmail.com", "address"));
+        userMessagesRepository.save(userMessages);
+        List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId);
+        assertThat(userMessagesSaved).isNotEmpty();
+        assertThat(userMessagesSaved).hasSize(1);
+        assertThat(userMessagesSaved.get(0).getUserMetadata()).isEqualTo(userMessages.getUserMetadata());
     }
 
     @Test
