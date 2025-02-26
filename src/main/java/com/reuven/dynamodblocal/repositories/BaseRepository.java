@@ -1,6 +1,5 @@
 package com.reuven.dynamodblocal.repositories;
 
-import com.reuven.dynamodblocal.entities.UserMessages;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -29,6 +28,7 @@ public abstract class BaseRepository<T> {
     protected final DynamoDbIndex<T> dynamoDbTableIndex;
     protected final DynamoDbClient dynamoDbClient;
     protected final Class<T> clazz;
+    protected final BeanTableSchema<T> beanTableSchema;
 
 
     public BaseRepository(DynamoDbClient dynamoDbClient, DynamoDbEnhancedClient dynamoDbEnhancedClient, Class<T> clazz) {
@@ -37,6 +37,7 @@ public abstract class BaseRepository<T> {
         this.dynamoDbTable = dynamoDbEnhancedClient.table(clazz.getSimpleName(), TableSchema.fromBean(clazz));
         this.dynamoDbTableIndex = dynamoDbTable.index(clazz.getSimpleName() + INDEX);
         this.clazz = clazz;
+        this.beanTableSchema = TableSchema.fromBean(clazz);
     }
 
     public void save(T item) {
@@ -104,7 +105,6 @@ public abstract class BaseRepository<T> {
     }
 
     protected List<T> toList(List<Map<String, AttributeValue>> attMaps) {
-        BeanTableSchema<T> beanTableSchema = TableSchema.fromBean(clazz);
         return attMaps.stream()
                 .map(beanTableSchema::mapToItem)
                 .toList();
