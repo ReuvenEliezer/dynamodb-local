@@ -74,7 +74,8 @@ public class S3Test extends AwsTestContainer {
 
         ResponseBytes<GetObjectResponse> object = s3Client.getObject(GetObjectRequest.builder().bucket(bucketName).key(objectKey).build(),
                 ResponseTransformer.toBytes());
-
+        String utf8String = object.asUtf8String();
+        assertThat(utf8String).isEqualTo(content);
         logger.info("Test passed: Bucket and object verified!");
     }
 
