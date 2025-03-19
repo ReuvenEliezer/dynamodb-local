@@ -2,7 +2,8 @@ package com.reuven.dynamodblocal;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -17,7 +18,7 @@ import java.util.List;
 @ExtendWith(TestcontainersExtension.class)
 public abstract class AwsTestContainer {
 
-    protected static final Logger logger = LogManager.getLogger(AwsTestContainer.class);
+    protected final Logger logger = LogManager.getLogger(this.getClass());
     private static final DockerImageName LOCALSTACK_IMAGE = DockerImageName.parse("localstack/localstack:4.2.0");
 
     @Container
