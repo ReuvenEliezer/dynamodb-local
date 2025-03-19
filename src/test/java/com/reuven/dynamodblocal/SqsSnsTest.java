@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.CreateTopicRequest;
 import software.amazon.awssdk.services.sns.model.CreateTopicResponse;
@@ -35,11 +36,13 @@ public class SqsSnsTest extends AwsTestContainer {
         String secretKey = localstack.getSecretKey();
 
         sqsClient = SqsClient.builder()
+                .region(Region.of(localstack.getRegion()))
                 .endpointOverride(localstack.getEndpointOverride(LocalStackContainer.Service.SQS))
                 .credentialsProvider(() -> AwsBasicCredentials.create(accessKey, secretKey))
                 .build();
 
         snsClient = SnsClient.builder()
+                .region(Region.of(localstack.getRegion()))
                 .endpointOverride(localstack.getEndpointOverride(LocalStackContainer.Service.SNS))
                 .credentialsProvider(() -> AwsBasicCredentials.create(accessKey, secretKey))
                 .build();
