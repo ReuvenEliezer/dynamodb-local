@@ -56,7 +56,7 @@ public class SqsSnsTest extends AwsTestContainer {
         String payload = "payload";
         snsClient.publish(PublishRequest.builder().topicArn(topicArn).message(payload).build());
 
-        List<Message> messagesFromQueue = getMessagesFromQueue(queueUrl, Duration.ofSeconds(1));
+        List<Message> messagesFromQueue = getMessagesFromQueue(queueUrl, Duration.ofSeconds(2));
 
         assertThat(messagesFromQueue).isNotEmpty();
         Message message = messagesFromQueue.getFirst();
@@ -97,7 +97,7 @@ public class SqsSnsTest extends AwsTestContainer {
         String payloadFromMessage = jsonNode.get("Message").asText();
         assertThat(payloadFromMessage).isEqualTo(payload);
 
-        List<Message> messagesFromQueue2 = getMessagesFromQueue(createQueueResponse2.queueUrl(), Duration.ofSeconds(1));
+        List<Message> messagesFromQueue2 = getMessagesFromQueue(createQueueResponse2.queueUrl(), Duration.ofSeconds(2));
 
         assertThat(messagesFromQueue2).isNotEmpty();
         Message message2 = messagesFromQueue2.getFirst();
