@@ -18,7 +18,7 @@ import java.util.List;
 public abstract class AwsTestContainer {
 
     protected static final Logger logger = LogManager.getLogger(AwsTestContainer.class);
-    private static final DockerImageName LOCALSTACK_IMAGE = DockerImageName.parse("localstack/localstack:4.0.3");
+    private static final DockerImageName LOCALSTACK_IMAGE = DockerImageName.parse("localstack/localstack:4.2.0");
 
     @Container
     protected LocalStackContainer localstack = new LocalStackContainer(LOCALSTACK_IMAGE)
