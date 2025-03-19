@@ -1,5 +1,6 @@
 package com.reuven.dynamodblocal;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
@@ -46,8 +47,8 @@ public class DynamoDbTest extends AwsTestContainer {
     }
 
     @Override
-    protected LocalStackContainer.Service getService() {
-        return LocalStackContainer.Service.DYNAMODB;
+    protected List<LocalStackContainer.@NotNull Service> getServices() {
+        return List.of(LocalStackContainer.Service.DYNAMODB);
     }
 
 

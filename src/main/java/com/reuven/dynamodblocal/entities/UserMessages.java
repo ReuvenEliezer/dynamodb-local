@@ -32,6 +32,7 @@ public class UserMessages {
     private LocalDateTime createdTime; // Sort Key (stored as String in ISO-8601 format)
     private String message;
     private UserMetadata userMetadata;
+    private Boolean isRead;
 
     // Default constructor (Required)
     public UserMessages() {}
@@ -99,6 +100,14 @@ public class UserMessages {
         this.userMetadata = userMetadata;
     }
 
+    @DynamoDbAttribute(IS_READ)
+    public Boolean getRead() {
+        return isRead;
+    }
+
+    public void setRead(Boolean read) {
+        isRead = read;
+    }
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -119,6 +128,10 @@ public class UserMessages {
                 ", messageUuid='" + messageUuid + '\'' +
                 ", createdTime=" + createdTime +
                 ", message='" + message + '\'' +
+                ", userMetadata=" + userMetadata +
+                ", isRead=" + isRead +
                 '}';
     }
+
+
 }

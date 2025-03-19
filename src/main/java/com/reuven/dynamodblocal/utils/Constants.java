@@ -7,4 +7,6 @@ public class Constants {
     public static final String MESSAGE = "Message";
     public static final String USER_METADATA = "UserMetadata";
     public static final String USER_MESSAGES_INDEX = "UserMessagesIndex";
+    public static final String IS_READ = "IsRead";
+
 }

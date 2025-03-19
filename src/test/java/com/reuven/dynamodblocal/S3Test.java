@@ -1,5 +1,6 @@
 package com.reuven.dynamodblocal;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,7 +27,7 @@ public class S3Test extends AwsTestContainer {
     void setup() {
         super.setup();
         // Get S3 endpoint and credentials from LocalStack
-        URI endpoint = localstack.getEndpointOverride(getService());
+        URI endpoint = localstack.getEndpointOverride(LocalStackContainer.Service.S3);
         String accessKey = localstack.getAccessKey();
         String secretKey = localstack.getSecretKey();
 
@@ -80,7 +82,7 @@ public class S3Test extends AwsTestContainer {
     }
 
     @Override
-    protected LocalStackContainer.Service getService() {
-        return LocalStackContainer.Service.S3;
+    protected List<LocalStackContainer.@NotNull Service> getServices() {
+        return List.of(LocalStackContainer.Service.S3);
     }
 }

@@ -10,7 +10,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.junit.jupiter.TestcontainersExtension;
 import org.testcontainers.utility.DockerImageName;
 
-import java.time.Duration;
+import java.util.List;
 
 //@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Testcontainers
@@ -22,7 +22,7 @@ public abstract class AwsTestContainer {
 
     @Container
     protected LocalStackContainer localstack = new LocalStackContainer(LOCALSTACK_IMAGE)
-            .withServices(getService())
+            .withServices(getServices().toArray(new LocalStackContainer.Service[0]))
 //            .withLogConsumer(outputFrame -> logger.info(outputFrame.getUtf8String()))
 //            .withStartupTimeout(Duration.ofMinutes(1));
             ;
@@ -42,6 +42,6 @@ public abstract class AwsTestContainer {
         }
     }
 
-    protected abstract LocalStackContainer.Service getService();
+    protected abstract List<LocalStackContainer.Service> getServices();
 
 }

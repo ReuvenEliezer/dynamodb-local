@@ -104,6 +104,29 @@ class DynamodbLocalApplicationTests {
     }
 
     @Test
+    void booleanItemTest() {
+        String userId = "1";
+        UserMessages userMessages = new UserMessages(userId, MESSAGE, new UserMetadata("email@gmail.com", "address"));
+        userMessages.setRead(Boolean.TRUE);
+        userMessagesRepository.save(userMessages);
+        List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId);
+        assertThat(userMessagesSaved).isNotEmpty();
+        assertThat(userMessagesSaved).hasSize(1);
+        assertThat(userMessagesSaved.getFirst().getRead()).isTrue();
+    }
+
+    @Test
+    void booleanNullValueItemTest() {
+        String userId = "1";
+        UserMessages userMessages = new UserMessages(userId, MESSAGE, new UserMetadata("email@gmail.com", "address"));
+        userMessagesRepository.save(userMessages);
+        List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId);
+        assertThat(userMessagesSaved).isNotEmpty();
+        assertThat(userMessagesSaved).hasSize(1);
+        assertThat(userMessagesSaved.get(0).getRead()).isNull();
+    }
+
+    @Test
     void userMessagesBatchSaveTest() {
         String userId1 = "1";
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
