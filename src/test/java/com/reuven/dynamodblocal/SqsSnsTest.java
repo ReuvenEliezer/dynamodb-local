@@ -78,7 +78,7 @@ public class SqsSnsTest extends AwsTestContainer {
     }
 
     @Test
-    void sendMessageToSnsAndConsumeBy2SqsTest() throws JsonProcessingException {
+    void sendMessageToSnsAndConsumeBy2DifferentSqsTest() throws JsonProcessingException {
         CreateTopicResponse createTopicResponse = createTopic("topicName");
         CreateQueueResponse createQueueResponse1 = createQueue("queueName1");
         CreateQueueResponse createQueueResponse2 = createQueue("queueName2");
