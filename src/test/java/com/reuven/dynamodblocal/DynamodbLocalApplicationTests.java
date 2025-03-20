@@ -4,28 +4,32 @@ import com.reuven.dynamodblocal.dto.PaginatedResult;
 import com.reuven.dynamodblocal.dto.UserMessagesPageResponse;
 import com.reuven.dynamodblocal.dto.UserMessagesPageResponse1;
 import com.reuven.dynamodblocal.entities.UserMessages;
+import com.reuven.dynamodblocal.entities.UserMetadata;
 import com.reuven.dynamodblocal.repositories.UserMessagesRepository;
 import jakarta.annotation.PostConstruct;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.BeanTableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteResult;
 import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.ScanEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
+import static com.reuven.dynamodblocal.utils.Constants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -49,25 +53,6 @@ class DynamodbLocalApplicationTests {
     @PostConstruct
     void init() {
         userMessagesTable = dynamoDbEnhancedClient.table(UserMessages.class.getSimpleName(), TableSchema.fromBean(UserMessages.class));
-    }
-
-//    private static final GenericContainer<?> dynamoDbLocal = new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local"))
-//            .withExposedPorts(8000);
-//
-
-    private static Process pr;
-
-    @BeforeAll
-    static void setUp() throws IOException {
-        Runtime rt = Runtime.getRuntime();
-//        pr = rt.exec("docker compose -f docker-compose.yml up -d --wait");
-//        dynamoDbLocal.start();
-    }
-
-    @AfterAll
-    static void tearDown() {
-//        pr.destroy();
-//        dynamoDbLocal.stop();
     }
 
     @BeforeEach
@@ -101,10 +86,44 @@ class DynamodbLocalApplicationTests {
     void saveElementTest() {
         String userId = "1";
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        userMessagesRepository.save(createUserMessage(userId, "message", now));
+        userMessagesRepository.save(createUserMessage(userId, MESSAGE, now));
         List<UserMessages> userMessages = userMessagesRepository.getUserMessages(userId);
         assertThat(userMessages).isNotEmpty();
         assertThat(userMessages).hasSize(1);
+    }
+
+    @Test
+    void saveElementWithConverterTest() {
+        String userId = "1";
+        UserMessages userMessages = new UserMessages(userId, MESSAGE, new UserMetadata("email@gmail.com", "address"));
+        userMessagesRepository.save(userMessages);
+        List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId);
+        assertThat(userMessagesSaved).isNotEmpty();
+        assertThat(userMessagesSaved).hasSize(1);
+        assertThat(userMessagesSaved.get(0).getUserMetadata()).isEqualTo(userMessages.getUserMetadata());
+    }
+
+    @Test
+    void booleanItemTest() {
+        String userId = "1";
+        UserMessages userMessages = new UserMessages(userId, MESSAGE, new UserMetadata("email@gmail.com", "address"));
+        userMessages.setRead(Boolean.TRUE);
+        userMessagesRepository.save(userMessages);
+        List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId);
+        assertThat(userMessagesSaved).isNotEmpty();
+        assertThat(userMessagesSaved).hasSize(1);
+        assertThat(userMessagesSaved.getFirst().getRead()).isTrue();
+    }
+
+    @Test
+    void booleanNullValueItemTest() {
+        String userId = "1";
+        UserMessages userMessages = new UserMessages(userId, MESSAGE, new UserMetadata("email@gmail.com", "address"));
+        userMessagesRepository.save(userMessages);
+        List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId);
+        assertThat(userMessagesSaved).isNotEmpty();
+        assertThat(userMessagesSaved).hasSize(1);
+        assertThat(userMessagesSaved.get(0).getRead()).isNull();
     }
 
     @Test
@@ -149,6 +168,33 @@ class DynamodbLocalApplicationTests {
     }
 
     @Test
+    void attMapToObjTest() {
+        String userId1 = "1";
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        List<UserMessages> userMessages = List.of(
+                createUserMessage(userId1, "message1", now.minusDays(5)),
+                createUserMessage(userId1, "message2", now.minusDays(4)),
+                createUserMessage(userId1, "message3", now.minusDays(2)),
+                createUserMessage(userId1, "message4", now.minusDays(6))
+        );
+        userMessagesRepository.save(userMessages);
+
+        List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId1);
+        Map<String, AttributeValue> stringAttributeValueMap = BeanTableSchema.create(UserMessages.class)
+                .itemToMap(userMessagesSaved.get(0), true);
+        List<Map<String, AttributeValue>> userMessagesSavedAttMap = userMessagesSaved.stream()
+                .map(userMessages1 ->
+                        BeanTableSchema.create(UserMessages.class).itemToMap(userMessages1, true))
+                .toList();
+        List<UserMessages> userMessagesConverted = userMessagesSavedAttMap.stream()
+                .map(attMap ->
+                        BeanTableSchema.create(UserMessages.class).mapToItem(attMap))
+                .toList();
+
+        assertThat(userMessagesConverted).isEqualTo(userMessagesSaved);
+    }
+
+    @Test
     void paginationTest() {
         String userId1 = "1";
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
@@ -165,9 +211,9 @@ class DynamodbLocalApplicationTests {
         ));
 
         Map<String, AttributeValue> exclusiveStartKey = Map.of(
-                "UserId", AttributeValue.builder().s(userId1).build(),
-                "CreatedTime", AttributeValue.builder().s(now.toString()).build(),
-                "MessageUuid", AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
+                USER_ID, AttributeValue.builder().s(userId1).build(),
+                CREATED_TIME, AttributeValue.builder().s(now.toString()).build(),
+                MESSAGE_UUID, AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
         );
 
         PaginatedResult<UserMessages> userMessages;
@@ -215,6 +261,10 @@ class DynamodbLocalApplicationTests {
         userMessagesRepository.save(userMessages);
 
         List<UserMessages> userMessagesSaved = userMessagesRepository.getUserMessages(userId1);
+        Map<String, AttributeValue> stringAttributeValueMap = BeanTableSchema.create(UserMessages.class)
+                .itemToMap(userMessagesSaved.get(0), true);
+        userMessagesSaved.stream().map(userMessages1 -> BeanTableSchema.create(UserMessages.class).itemToMap(userMessages1, true))
+                .forEach(System.out::println);
         assertThat(userMessagesSaved).hasSize(userMessages.size());
         assertThat(userMessagesSaved)
                 .satisfies(list -> {
