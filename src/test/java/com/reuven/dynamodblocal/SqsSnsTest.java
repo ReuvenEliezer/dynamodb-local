@@ -15,6 +15,7 @@ import software.amazon.awssdk.services.sqs.model.*;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -118,11 +119,29 @@ public class SqsSnsTest extends AwsTestContainer {
 
         String queueArn = queueAttributes.attributes().get(QueueAttributeName.QUEUE_ARN);
 
+        setSqsPermissionPolicy(queueUrl, topicArn, queueArn);
+
         snsClient.subscribe(SubscribeRequest.builder()
                 .topicArn(topicArn)
                 .protocol("sqs")
                 .endpoint(queueArn)
                 .build());
+    }
+
+    private static void setSqsPermissionPolicy(String queueUrl, String topicArn, String queueArn) {
+        String policy = String.format(
+                "{ \"Version\": \"2012-10-17\", \"Statement\": [ { \"Sid\": \"topic-subscription-%s\", \"Effect\": \"Allow\", \"Principal\": { \"AWS\": \"*\" }, \"Action\": \"sqs:SendMessage\", \"Resource\": \"%s\", \"Condition\": { \"ArnLike\": { \"aws:SourceArn\": \"%s\" } } } ] }",
+                topicArn,
+                queueArn,
+                topicArn
+        );
+
+        SetQueueAttributesRequest setQueueAttributesRequest = SetQueueAttributesRequest.builder()
+                .queueUrl(queueUrl)
+                .attributes(Map.of(QueueAttributeName.POLICY, policy))
+                .build();
+
+        sqsClient.setQueueAttributes(setQueueAttributesRequest);
     }
 
     private List<Message> getMessagesFromQueue(String queueUrl, Duration waitTimeDuration) {
