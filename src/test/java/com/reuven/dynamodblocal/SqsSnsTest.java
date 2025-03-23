@@ -66,6 +66,9 @@ public class SqsSnsTest extends AwsTestContainer {
         JsonNode jsonNode = objectMapper.readTree(message.body());
         String payloadFromMessage = jsonNode.get("Message").asText();
         assertThat(payloadFromMessage).isEqualTo(payload);
+
+        List<Message> messagesFromQueueAfterConsumed = getMessagesFromQueue(queueUrl, Duration.ofSeconds(2));
+        assertThat(messagesFromQueueAfterConsumed).isEmpty();
     }
 
     private static CreateQueueResponse createQueue(String queueName) {
