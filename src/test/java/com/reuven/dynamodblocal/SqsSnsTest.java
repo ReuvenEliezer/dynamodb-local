@@ -9,10 +9,7 @@ import org.testcontainers.containers.localstack.LocalStackContainer;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sns.SnsClient;
-import software.amazon.awssdk.services.sns.model.CreateTopicRequest;
-import software.amazon.awssdk.services.sns.model.CreateTopicResponse;
-import software.amazon.awssdk.services.sns.model.PublishRequest;
-import software.amazon.awssdk.services.sns.model.SubscribeRequest;
+import software.amazon.awssdk.services.sns.model.*;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.*;
 
@@ -50,7 +47,7 @@ public class SqsSnsTest extends AwsTestContainer {
 
 
     @Test
-    void sendMessageToSnsAndConsumeBySqsTest() throws JsonProcessingException {
+    void sendMessageToSnsAndSubscribeQueueTest() throws JsonProcessingException {
         CreateTopicResponse createTopicResponse = createTopic("topicName");
         CreateQueueResponse createQueueResponse = createQueue("queueName");
         String queueUrl = createQueueResponse.queueUrl();
@@ -71,20 +68,8 @@ public class SqsSnsTest extends AwsTestContainer {
         assertThat(messagesFromQueueAfterConsumed).isEmpty();
     }
 
-    private static CreateQueueResponse createQueue(String queueName) {
-        return sqsClient.createQueue(CreateQueueRequest.builder()
-                .queueName(queueName)
-                .build());
-    }
-
-    private static CreateTopicResponse createTopic(String topicName) {
-        return snsClient.createTopic(CreateTopicRequest.builder()
-                .name(topicName)
-                .build());
-    }
-
     @Test
-    void sendMessageToSnsAndConsumeBy2DifferentSqsTest() throws JsonProcessingException {
+    void sendMessageToSnsAnd2SqsSubscribersTest() throws JsonProcessingException {
         CreateTopicResponse createTopicResponse = createTopic("topicName");
         CreateQueueResponse createQueueResponse1 = createQueue("queueName1");
         CreateQueueResponse createQueueResponse2 = createQueue("queueName2");
@@ -95,7 +80,7 @@ public class SqsSnsTest extends AwsTestContainer {
         String payload = "payload";
         snsClient.publish(PublishRequest.builder().topicArn(topicArn).message(payload).build());
 
-        List<Message> messagesFromQueue1 = getMessagesFromQueue(createQueueResponse1.queueUrl(), Duration.ofSeconds(1));
+        List<Message> messagesFromQueue1 = getMessagesFromQueue(createQueueResponse1.queueUrl(), Duration.ofSeconds(2));
 
         assertThat(messagesFromQueue1).isNotEmpty();
         Message message = messagesFromQueue1.getFirst();
@@ -111,6 +96,18 @@ public class SqsSnsTest extends AwsTestContainer {
         String payloadFromMessage2 = jsonNode2.get("Message").asText();
         assertThat(payloadFromMessage2).isEqualTo(payload);
 
+    }
+
+    private static CreateQueueResponse createQueue(String queueName) {
+        return sqsClient.createQueue(CreateQueueRequest.builder()
+                .queueName(queueName)
+                .build());
+    }
+
+    private static CreateTopicResponse createTopic(String topicName) {
+        return snsClient.createTopic(CreateTopicRequest.builder()
+                .name(topicName)
+                .build());
     }
 
     private void subscribeQueue(String queueUrl, String topicArn) {
