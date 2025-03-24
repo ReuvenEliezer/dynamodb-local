@@ -24,14 +24,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.reuven.dynamodblocal.utils.Constants.*;
+
 @Repository
 public class UserMessagesRepository extends BaseRepository<UserMessages> {
 
+    private static final String DELIMITER = "#";
     private static final Map<String, String> EXPRESSION_ATTRIBUTE_NAME_MAP = Map.of(
-            "#message", "Message"
+            DELIMITER + MESSAGE.toLowerCase(), MESSAGE
     );
     private static final String PROJECTION_EXPRESSION_VALUES = String.join(", ", EXPRESSION_ATTRIBUTE_NAME_MAP.keySet());
-    private static final String DELIMITER = "#";
 
     public UserMessagesRepository(DynamoDbClient dynamoDbClient, DynamoDbEnhancedClient dynamoDbEnhancedClient) {
         super(dynamoDbClient, dynamoDbEnhancedClient, UserMessages.class);
@@ -83,7 +85,7 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
                 .limit(limit);
 
         if (exclusiveStartKey != null && !exclusiveStartKey.isEmpty()) {
-            if (!exclusiveStartKey.containsKey("UserId") || !exclusiveStartKey.containsKey("CreatedTime") || !exclusiveStartKey.containsKey("MessageUuid")) {
+            if (!exclusiveStartKey.containsKey(USER_ID) || !exclusiveStartKey.containsKey(CREATED_TIME) || !exclusiveStartKey.containsKey(MESSAGE_UUID)) {
                 throw new IllegalArgumentException("Invalid exclusiveStartKey provided");
             }
             queryRequestBuilder.exclusiveStartKey(exclusiveStartKey);
@@ -111,7 +113,7 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
 
     public UserMessagesPageResponse getUserMessagesPage(String userId, Integer limit, Map<String, AttributeValue> exclusiveStartKey) {
         Map<String, Condition> conditionsMap = Map.of(
-                "UserId", Condition.builder()
+                USER_ID, Condition.builder()
                         .comparisonOperator(ComparisonOperator.EQ)
                         .attributeValueList(AttributeValue.builder().s(userId).build())
                         .build());
@@ -124,7 +126,7 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
 
     public UserMessagesPageResponse1 getUserMessagesPage(String userId, Integer limit, String page) {
         Map<String, Condition> conditionsMap = Map.of(
-                "UserId", Condition.builder()
+                USER_ID, Condition.builder()
                         .comparisonOperator(ComparisonOperator.EQ)
                         .attributeValueList(AttributeValue.builder().s(userId).build())
                         .build());
@@ -141,8 +143,8 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
         if (lastEvaluatedKey.isEmpty()) {
             return null;
         }
-        String messageUuid = lastEvaluatedKey.get("MessageUuid").s();
-        String createdTime = lastEvaluatedKey.get("CreatedTime").s();
+        String messageUuid = lastEvaluatedKey.get(MESSAGE_UUID).s();
+        String createdTime = lastEvaluatedKey.get(CREATED_TIME).s();
         return createdTime + UriUtils.encode(DELIMITER, StandardCharsets.UTF_8) + messageUuid;
     }
 
@@ -153,16 +155,16 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
         String pageDecode = UriUtils.decode(page, StandardCharsets.UTF_8);
         String[] pageParts = pageDecode.split(DELIMITER);
         if (pageParts.length != 2) {
-            String message = String.format("Invalid nextPage format for userId=%s, must be in the format: %s%s%s", userId, "CreatedTime", DELIMITER, "MessageUuid");
+            String message = String.format("Invalid nextPage format for userId=%s, must be in the format: %s%s%s", userId, CREATED_TIME, DELIMITER, MESSAGE_UUID);
             logger.error(message);
-            throw new IllegalArgumentException("message");
+            throw new IllegalArgumentException(MESSAGE);
         }
         String createdTime = pageParts[0];
         String messageUuid = pageParts[1];
         return Map.of(
-                "UserId", AttributeValue.builder().s(userId).build(),
-                "MessageUuid", AttributeValue.builder().s(messageUuid).build(),
-                "CreatedTime", AttributeValue.builder().s(createdTime).build()
+                USER_ID, AttributeValue.builder().s(userId).build(),
+                MESSAGE_UUID, AttributeValue.builder().s(messageUuid).build(),
+                CREATED_TIME, AttributeValue.builder().s(createdTime).build()
         );
     }
 
@@ -188,11 +190,11 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
 
     public QueryResponse getUserMessages(String userId, LocalDateTime createdTimeBefore, Map<String, AttributeValue> exclusiveStartKey, Integer limit) {
         Map<String, Condition> conditionsMap = Map.of(
-                "UserId", Condition.builder()
+                USER_ID, Condition.builder()
                         .comparisonOperator(ComparisonOperator.EQ)
                         .attributeValueList(AttributeValue.builder().s(userId).build())
                         .build(),
-                "CreatedTime", Condition.builder()
+                CREATED_TIME, Condition.builder()
                         .comparisonOperator(ComparisonOperator.LE)
                         .attributeValueList(AttributeValue.builder().s(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME)).build())
                         .build());

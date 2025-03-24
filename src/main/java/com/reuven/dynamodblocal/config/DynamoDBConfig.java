@@ -1,6 +1,7 @@
 package com.reuven.dynamodblocal.config;
 
 import com.reuven.dynamodblocal.entities.UserMessages;
+import com.reuven.dynamodblocal.utils.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.context.annotation.Bean;
@@ -34,7 +35,7 @@ public class DynamoDBConfig {
                 .endpointOverride(URI.create("http://localhost:8000"))
                 .region(Region.US_WEST_2)
                 .build();
-        createTable(amazonDynamoDB, USER_MESSAGES_TABLE_NAME, "UserId", "MessageUuid");
+        createTable(amazonDynamoDB, USER_MESSAGES_TABLE_NAME, Constants.USER_ID, Constants.MESSAGE_UUID);
         return amazonDynamoDB;
     }
 
@@ -52,6 +53,7 @@ public class DynamoDBConfig {
         }
         DynamoDbWaiter dbWaiter = ddb.waiter();
         CreateTableRequest request = CreateTableRequest.builder()
+                .tableName(tableName)
                 .attributeDefinitions(
                         AttributeDefinition.builder()
                                 .attributeName(partitionKey)
@@ -62,7 +64,7 @@ public class DynamoDBConfig {
                                 .attributeType(ScalarAttributeType.S) // Sort key type
                                 .build(),
                         AttributeDefinition.builder()
-                                .attributeName("CreatedTime")
+                                .attributeName(Constants.CREATED_TIME)
                                 .attributeType(ScalarAttributeType.S)
                                 .build())
                 .keySchema(
@@ -83,7 +85,7 @@ public class DynamoDBConfig {
                                                 .keyType(KeyType.HASH)
                                                 .build(),
                                         KeySchemaElement.builder()
-                                                .attributeName("CreatedTime")
+                                                .attributeName(Constants.CREATED_TIME)
                                                 .keyType(KeyType.RANGE)
                                                 .build())
                                 .projection(Projection.builder()
@@ -92,7 +94,6 @@ public class DynamoDBConfig {
                                 .provisionedThroughput(buildProvisionedThroughput(5L, 5L))
                                 .build())
                 .provisionedThroughput(buildProvisionedThroughput(10L, 10L))
-                .tableName(tableName)
                 .build();
 
         CreateTableResponse response = ddb.createTable(request);
