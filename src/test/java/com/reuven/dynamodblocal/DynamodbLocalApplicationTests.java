@@ -365,7 +365,7 @@ class DynamodbLocalApplicationTests {
 
         ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
         PageIterable<UserMessages> pages = userMessagesTable.scan(scanRequest);
-        assertThat(pages.items()).hasSize(0);
+        assertThat(pages.items()).isEmpty();
     }
 
     @Test
