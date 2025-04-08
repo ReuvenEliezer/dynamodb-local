@@ -424,7 +424,7 @@ class DynamodbLocalApplicationTests {
 
     private UserMessages createUserMessage(String userId, String message, LocalDateTime createdTime, UUID uuid) {
         UserMessages userMessage = createUserMessage(userId, message, createdTime);
-        setField(userMessage, "messageUuid", uuid.toString());
+        setField(userMessage, "messageUuid", uuid);
         return userMessage;
     }
 
