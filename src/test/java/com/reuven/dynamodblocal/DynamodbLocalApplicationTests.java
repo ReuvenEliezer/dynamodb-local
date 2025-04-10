@@ -241,7 +241,7 @@ class DynamodbLocalApplicationTests {
 
         count = 0;
         do {
-            userMessages = userMessagesRepository.getUserMessages(userId1, now.plusMinutes(1), limit, exclusiveStartKey2);
+            userMessages = userMessagesRepository.getUserMessages(userId1, now, limit, exclusiveStartKey2);
             logger.info("userMessages - items: {}", userMessages.items());
             exclusiveStartKey2 = userMessages.lastEvaluatedKey();
             logger.info("LastEvaluatedKey: {}", exclusiveStartKey2);
