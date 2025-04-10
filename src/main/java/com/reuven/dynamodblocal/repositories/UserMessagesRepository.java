@@ -73,11 +73,14 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
                                                          Integer limit,
                                                          Map<String, AttributeValue> exclusiveStartKey) {
         logger.info("Fetching paginated records...");
+        AttributeValue attributeValue1 = AttributeValue.builder().s(createdTimeBefore.toString()).build();
+        AttributeValue attributeValue2 = AttributeValue.fromS(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME));
+
         QueryEnhancedRequest.Builder queryRequestBuilder = QueryEnhancedRequest.builder()
                 .queryConditional(QueryConditional
                         .sortLessThanOrEqualTo(Key.builder()
                                 .partitionValue(userId)
-                                .sortValue(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME))
+                                .sortValue(attributeValue1)
                                 .build())
                 )
 //                .consistentRead(false)
