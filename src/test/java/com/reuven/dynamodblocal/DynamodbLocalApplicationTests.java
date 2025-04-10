@@ -211,9 +211,12 @@ class DynamodbLocalApplicationTests {
                 user2Message1Now, user2Message2Now
         ));
 
+        LocalDateTime createdTimeBefore = now;//.plusDays(1);
+        AttributeValue attributeValue1 = AttributeValue.builder().s(createdTimeBefore.toString()).build();
+        AttributeValue attributeValue2 = AttributeValue.fromS(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME));
         Map<String, AttributeValue> exclusiveStartKey = Map.of(
                 USER_ID, AttributeValue.builder().s(userId1).build(),
-                CREATED_TIME, AttributeValue.builder().s(now.toString()).build(),
+                CREATED_TIME, attributeValue1,
                 MESSAGE_UUID, AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
         );
 
@@ -221,7 +224,7 @@ class DynamodbLocalApplicationTests {
         final int limit = 1;
         int count = 0;
         do {
-            userMessages = userMessagesRepository.getUserMessages(userId1, now.plusDays(1), limit, exclusiveStartKey);
+            userMessages = userMessagesRepository.getUserMessages(userId1, createdTimeBefore, limit, exclusiveStartKey);
             logger.info("userMessages - items: {}", userMessages.items());
             exclusiveStartKey = userMessages.lastEvaluatedKey();
             logger.info("LastEvaluatedKey: {}", exclusiveStartKey);
@@ -233,15 +236,18 @@ class DynamodbLocalApplicationTests {
 
         assertThat(count).isEqualTo(2);
 
+        createdTimeBefore = now.minusDays(1);
+        attributeValue1 = AttributeValue.builder().s(createdTimeBefore.toString()).build();
+        attributeValue2 = AttributeValue.fromS(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME));
         Map<String, AttributeValue> exclusiveStartKey2 = Map.of(
                 USER_ID, AttributeValue.builder().s(userId1).build(),
-                CREATED_TIME, AttributeValue.fromS(now.format(DateTimeFormatter.ISO_DATE_TIME)),
+                CREATED_TIME, attributeValue1,
                 MESSAGE_UUID, AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
         );
 
         count = 0;
         do {
-            userMessages = userMessagesRepository.getUserMessages(userId1, now, limit, exclusiveStartKey2);
+            userMessages = userMessagesRepository.getUserMessages(userId1, createdTimeBefore, limit, exclusiveStartKey2);
             logger.info("userMessages - items: {}", userMessages.items());
             exclusiveStartKey2 = userMessages.lastEvaluatedKey();
             logger.info("LastEvaluatedKey: {}", exclusiveStartKey2);
