@@ -212,7 +212,7 @@ class DynamodbLocalApplicationTests {
         ));
 
         LocalDateTime createdTimeBefore = now;//.plusDays(1);
-        AttributeValue attributeValue1 = AttributeValue.builder().s(createdTimeBefore.toString()).build();
+        AttributeValue attributeValue1 = AttributeValue.fromS(createdTimeBefore.toString());
         AttributeValue attributeValue2 = AttributeValue.fromS(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME));
         Map<String, AttributeValue> exclusiveStartKey = Map.of(
                 USER_ID, AttributeValue.builder().s(userId1).build(),
@@ -237,7 +237,7 @@ class DynamodbLocalApplicationTests {
         assertThat(count).isEqualTo(2);
 
         createdTimeBefore = now.minusDays(1);
-        attributeValue1 = AttributeValue.builder().s(createdTimeBefore.toString()).build();
+        attributeValue1 = AttributeValue.fromS(createdTimeBefore.toString());
         attributeValue2 = AttributeValue.fromS(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME));
         Map<String, AttributeValue> exclusiveStartKey2 = Map.of(
                 USER_ID, AttributeValue.builder().s(userId1).build(),
