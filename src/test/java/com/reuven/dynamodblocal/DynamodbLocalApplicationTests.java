@@ -27,6 +27,7 @@ import software.amazon.awssdk.services.dynamodb.model.*;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static com.reuven.dynamodblocal.utils.Constants.*;
@@ -232,13 +233,18 @@ class DynamodbLocalApplicationTests {
 
         assertThat(count).isEqualTo(2);
 
+        Map<String, AttributeValue> exclusiveStartKey2 = Map.of(
+                USER_ID, AttributeValue.builder().s(userId1).build(),
+                CREATED_TIME, AttributeValue.fromS(now.format(DateTimeFormatter.ISO_DATE_TIME)),
+                MESSAGE_UUID, AttributeValue.builder().s("dummy").build() // dummy value not take in the index key but must provide in map
+        );
 
         count = 0;
         do {
-            userMessages = userMessagesRepository.getUserMessages(userId1, now.minusDays(1), limit, exclusiveStartKey);
+            userMessages = userMessagesRepository.getUserMessages(userId1, now, limit, exclusiveStartKey2);
             logger.info("userMessages - items: {}", userMessages.items());
-            exclusiveStartKey = userMessages.lastEvaluatedKey();
-            logger.info("LastEvaluatedKey: {}", exclusiveStartKey);
+            exclusiveStartKey2 = userMessages.lastEvaluatedKey();
+            logger.info("LastEvaluatedKey: {}", exclusiveStartKey2);
             userMessages.items().forEach(System.out::println);
             if (userMessages.lastEvaluatedKey() != null) {
                 count++;

@@ -77,7 +77,7 @@ public class UserMessagesRepository extends BaseRepository<UserMessages> {
                 .queryConditional(QueryConditional
                         .sortLessThanOrEqualTo(Key.builder()
                                 .partitionValue(userId)
-                                .sortValue(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME))
+                                .sortValue(AttributeValue.fromS(createdTimeBefore.format(DateTimeFormatter.ISO_DATE_TIME)))
                                 .build())
                 )
 //                .consistentRead(false)
